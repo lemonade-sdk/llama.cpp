@@ -31,7 +31,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - ROCM_VERSION: "7.13.0"
+          - ROCM_VERSION: "7.14.0"
             gpu_targets: "gfx906;gfx908;gfx90a;gfx942;gfx950;gfx1010;gfx1011;gfx1012;gfx1030;gfx1031;gfx1032;gfx1033;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1152;gfx1200;gfx1201"
             build: x64
 
@@ -75,17 +75,37 @@ jobs:
           sudo apt update
           sudo apt-get install -y libssl-dev rocm-hip-sdk
 
-      - name: Setup TheRock
+      - name: Setup TheRock with Wheels
         if: matrix.ROCM_VERSION != '7.2.1'
         id: therock_env
         run: |
-          wget https://repo.amd.com/rocm/tarball/therock-dist-linux-gfx1151-${{ matrix.ROCM_VERSION }}.tar.gz
-          mkdir install
-          tar -xf *.tar.gz -C install
-          export ROCM_PATH=$(pwd)/install
-          echo ROCM_PATH=$ROCM_PATH >> $GITHUB_ENV
-          echo PATH=$PATH:$ROCM_PATH/bin >> $GITHUB_ENV
-          echo LD_LIBRARY_PATH=$ROCM_PATH/lib:$ROCM_PATH/llvm/lib:$ROCM_PATH/lib/rocprofiler-systems >> $GITHUB_ENV
+          # Create Python virtual environment
+          python3 -m venv .venv
+          source .venv/bin/activate
+
+          # Install ROCm wheels for build
+          # libraries = HIP runtime and CMake configs needed for linking
+          # devel = compilers, headers, static libs
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://repo.amd.com/rocm/whl-multi-arch/ "rocm[libraries,devel]"
+
+          # Get ROCm installation paths using the rocm-sdk CLI tool
+          ROCM_PATH=$(rocm-sdk path --root)
+          CMAKE_PATH=$(rocm-sdk path --cmake)
+          BIN_PATH=$(rocm-sdk path --bin)
+          echo "ROCM_PATH=$ROCM_PATH"
+          echo "CMAKE_PATH=$CMAKE_PATH"
+          echo "BIN_PATH=$BIN_PATH"
+
+          # Set environment variables
+          echo "ROCM_PATH=$ROCM_PATH" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$CMAKE_PATH" >> $GITHUB_ENV
+          echo "HIP_PATH=$ROCM_PATH" >> $GITHUB_ENV
+          echo "$BIN_PATH" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=$ROCM_PATH/lib:${LD_LIBRARY_PATH:-}" >> $GITHUB_ENV
+
+          # Keep venv activated for subsequent steps
+          echo "$(pwd)/.venv/bin" >> $GITHUB_PATH
 
       - name: Build with native CMake HIP support
         id: cmake_build
@@ -658,7 +678,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - ROCM_VERSION: "7.13.0"
+          - ROCM_VERSION: "7.14.0"
             gpu_targets: "gfx906;gfx908;gfx90a;gfx942;gfx950;gfx1010;gfx1011;gfx1012;gfx1030;gfx1031;gfx1032;gfx1033;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1152;gfx1200;gfx1201"
             build: x64
 
@@ -675,7 +695,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\TheRock\build
-          key: rocm-${{ matrix.ROCM_VERSION }}-gfx1151-${{ runner.os }}
+          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-multi-arch-${{ runner.os }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -683,26 +703,51 @@ jobs:
           key: windows-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
 
-      - name: Install ROCm
+      - name: Install ROCm with Wheels
         if: steps.cache-rocm.outputs.cache-hit != 'true'
         run: |
           $ErrorActionPreference = "Stop"
-          write-host "Downloading AMD ROCm ${{ matrix.ROCM_VERSION }} tarball"
-          Invoke-WebRequest -Uri "https://repo.amd.com/rocm/tarball/therock-dist-windows-gfx1151-${{ matrix.ROCM_VERSION }}.tar.gz" -OutFile "${env:RUNNER_TEMP}\rocm.tar.gz"
-          write-host "Extracting ROCm tarball"
-          mkdir C:\TheRock\build -Force
-          tar -xzf "${env:RUNNER_TEMP}\rocm.tar.gz" -C C:\TheRock\build --strip-components=1
-          write-host "Completed ROCm extraction"
+          write-host "Setting up Python virtual environment"
+
+          # Create Python virtual environment
+          python -m venv .venv
+          & .venv\Scripts\Activate.ps1
+
+          write-host "Upgrading pip"
+          python -m pip install --upgrade pip
+
+          write-host "Installing ROCm wheels for multi-arch support"
+          # Install ROCm wheels for multi-arch support (this may take several minutes)
+          python -m pip install --index-url https://repo.amd.com/rocm/whl-multi-arch/ "rocm[libraries,devel,device-all]"
+
+          # Cache the venv location
+          write-host "Copying venv to cache location"
+          New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
+          Copy-Item -Recurse -Force .venv C:\TheRock\build\
+          write-host "Completed ROCm wheel installation to C:\TheRock\build"
 
       - name: Setup ROCm Environment
         run: |
-          $rocmPath = "C:\TheRock\build"
+          # Activate venv from cache or fresh install
+          & C:\TheRock\build\.venv\Scripts\Activate.ps1
+
+          # Get ROCm installation paths using the rocm-sdk CLI tool
+          $rocmPath = (rocm-sdk path --root).Trim()
+          $cmakePath = (rocm-sdk path --cmake).Trim()
+          $binPath = (rocm-sdk path --bin).Trim()
+          write-host "ROCm root: $rocmPath"
+          write-host "CMake path: $cmakePath"
+          write-host "Bin path: $binPath"
+
           echo "HIP_PATH=$rocmPath" >> $env:GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$cmakePath" >> $env:GITHUB_ENV
           echo "HIP_DEVICE_LIB_PATH=$rocmPath\lib\llvm\amdgcn\bitcode" >> $env:GITHUB_ENV
           echo "HIP_PLATFORM=amd" >> $env:GITHUB_ENV
           echo "LLVM_PATH=$rocmPath\lib\llvm" >> $env:GITHUB_ENV
-          echo "$rocmPath\bin" >> $env:GITHUB_PATH
-          echo "$rocmPath\lib\llvm\bin" >> $env:GITHUB_PATH
+          echo "$binPath" >> $env:GITHUB_PATH
+
+          # Keep venv in PATH for subsequent steps
+          echo "C:\TheRock\build\.venv\Scripts" >> $env:GITHUB_PATH
 
       - name: Build
         run: |
