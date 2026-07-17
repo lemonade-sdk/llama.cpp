@@ -718,7 +718,7 @@ jobs:
 
           write-host "Installing ROCm wheels for multi-arch support"
           # Install ROCm wheels for multi-arch support (this may take several minutes)
-          python -m pip install --index-url https://repo.amd.com/rocm/whl-multi-arch/ "rocm[libraries,devel,device-all]"
+          python -m pip install --index-url https://repo.amd.com/rocm/whl-multi-arch/ "rocm[libraries,devel]"
 
           # Cache the venv location
           write-host "Copying venv to cache location"
