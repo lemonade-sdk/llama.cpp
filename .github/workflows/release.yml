@@ -695,7 +695,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\TheRock\build
-          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-multi-arch-${{ runner.os }}
+          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-${{ runner.os }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
