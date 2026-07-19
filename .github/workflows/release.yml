@@ -728,8 +728,13 @@ jobs:
 
       - name: Setup ROCm Environment
         run: |
+          $ErrorActionPreference = "Stop"
+
           # Activate venv from cache or fresh install
           & C:\TheRock\build\.venv\Scripts\Activate.ps1
+
+          # Expand the devel tree so that rocm-sdk path queries return valid paths
+          rocm-sdk init
 
           # Get ROCm installation paths using the rocm-sdk CLI tool
           $rocmPath = (rocm-sdk path --root).Trim()
