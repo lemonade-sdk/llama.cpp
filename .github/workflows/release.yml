@@ -695,7 +695,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\TheRock\build
-          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-${{ runner.os }}
+          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-${{ runner.os }}-v2
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -709,9 +709,10 @@ jobs:
           $ErrorActionPreference = "Stop"
           write-host "Setting up Python virtual environment"
 
-          # Create Python virtual environment
-          python -m venv .venv
-          & .venv\Scripts\Activate.ps1
+          # Create the venv directly at the cache location to avoid relocation issues
+          New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
+          python -m venv C:\TheRock\build\.venv
+          & C:\TheRock\build\.venv\Scripts\Activate.ps1
 
           write-host "Upgrading pip"
           python -m pip install --upgrade pip
@@ -720,10 +721,10 @@ jobs:
           # Install ROCm wheels for multi-arch support (this may take several minutes)
           python -m pip install --index-url https://repo.amd.com/rocm/whl-multi-arch/ "rocm[libraries,devel]"
 
-          # Cache the venv location
-          write-host "Copying venv to cache location"
-          New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
-          Copy-Item -Recurse -Force .venv C:\TheRock\build\
+          # Pre-expand the devel tree so it is included in the cache
+          write-host "Initializing ROCm devel tree"
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
           write-host "Completed ROCm wheel installation to C:\TheRock\build"
 
       - name: Setup ROCm Environment
@@ -733,11 +734,14 @@ jobs:
           # Activate venv from cache or fresh install
           & C:\TheRock\build\.venv\Scripts\Activate.ps1
 
-          # Expand the devel tree so that rocm-sdk path queries return valid paths
+          # Expand the devel tree (idempotent; no-op if already done during install)
           rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
 
           # Get ROCm installation paths using the rocm-sdk CLI tool
-          $rocmPath = (rocm-sdk path --root).Trim()
+          $rocmPath = (rocm-sdk path --root)
+          if (-not $rocmPath) { throw "rocm-sdk path --root returned empty - devel package may not be installed" }
+          $rocmPath = $rocmPath.Trim()
           $cmakePath = (rocm-sdk path --cmake).Trim()
           $binPath = (rocm-sdk path --bin).Trim()
           write-host "ROCm root: $rocmPath"
