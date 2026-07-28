@@ -2,7 +2,7 @@ name: Release
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # every 6 hours (4 times daily)
+    - cron: '0 */12 * * *' # every 12 hours (2 times daily)
   workflow_dispatch: # allows manual triggering
     inputs:
       create_release:
