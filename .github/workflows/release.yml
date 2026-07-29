@@ -162,7 +162,43 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          sudo apt-get install -y cuda-toolkit-12-9 cmake ninja-build patchelf
+          # Install only the components this build actually consumes rather than
+          # the cuda-toolkit-12-9 metapackage. That metapackage drags in Nsight
+          # Systems/Compute, cuFFT, cuSPARSE, cuSOLVER and NPP -- ~3.9 GB of
+          # archives per job, none of it compiled against or shipped. The subset
+          # below is ~1.2 GB and covers everything the Build, Bundle CUDA runtime
+          # libraries and Validate steps reference:
+          #   cuda-nvcc          the compiler (pulls cuda-crt, cuda-nvvm)
+          #   cuda-cudart-dev    libcudart + the libcuda.so stub (CUDA::cuda_driver)
+          #   cuda-cccl          thrust/cub headers included by ggml-cuda
+          #   libcublas-dev      libcublas + libcublasLt
+          #   libcurand-dev      bundled and asserted on by Validate
+          #   libnvjitlink-dev   bundled and asserted on by Validate
+          # The -dev packages depend on their runtime counterparts, and
+          # cuda-toolkit-12-9-config-common (a transitive dep) is what creates the
+          # /usr/local/cuda -> /usr/local/cuda-12.9 alternative used below.
+          sudo apt-get install -y \
+            cuda-nvcc-12-9 \
+            cuda-cudart-dev-12-9 \
+            cuda-cccl-12-9 \
+            libcublas-dev-12-9 \
+            libcurand-dev-12-9 \
+            libnvjitlink-dev-12-9 \
+            cmake ninja-build patchelf
+
+          # Fail here, with the name of the missing file, rather than partway
+          # through the compile if NVIDIA ever repackages one of these out from
+          # under the hand-picked list above.
+          for f in /usr/local/cuda/bin/nvcc \
+                   /usr/local/cuda/include/cublas_v2.h \
+                   /usr/local/cuda/include/cub/cub.cuh \
+                   /usr/local/cuda/lib64/libcudart.so \
+                   /usr/local/cuda/lib64/libcublas.so \
+                   /usr/local/cuda/lib64/libcublasLt.so \
+                   /usr/local/cuda/lib64/libcurand.so \
+                   /usr/local/cuda/lib64/libnvJitLink.so; do
+            [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
+          done
 
       - name: Set CUDA environment
         run: |
@@ -320,7 +356,31 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          sudo apt-get install -y cuda-toolkit-12-9 cmake ninja-build patchelf
+          # See the x86_64 job above for why this is a hand-picked subset rather
+          # than the cuda-toolkit-12-9 metapackage. On sbsa the metapackage is
+          # ~3.3 GB of archives; this subset is ~1.2 GB.
+          sudo apt-get install -y \
+            cuda-nvcc-12-9 \
+            cuda-cudart-dev-12-9 \
+            cuda-cccl-12-9 \
+            libcublas-dev-12-9 \
+            libcurand-dev-12-9 \
+            libnvjitlink-dev-12-9 \
+            cmake ninja-build patchelf
+
+          # Fail here, with the name of the missing file, rather than partway
+          # through the compile if NVIDIA ever repackages one of these out from
+          # under the hand-picked list above.
+          for f in /usr/local/cuda/bin/nvcc \
+                   /usr/local/cuda/include/cublas_v2.h \
+                   /usr/local/cuda/include/cub/cub.cuh \
+                   /usr/local/cuda/lib64/libcudart.so \
+                   /usr/local/cuda/lib64/libcublas.so \
+                   /usr/local/cuda/lib64/libcublasLt.so \
+                   /usr/local/cuda/lib64/libcurand.so \
+                   /usr/local/cuda/lib64/libnvJitLink.so; do
+            [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
+          done
 
       - name: Set CUDA environment
         run: |
