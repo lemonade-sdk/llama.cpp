@@ -276,7 +276,7 @@ jobs:
           pkgdir="llama-${{ steps.tag.outputs.name }}"
           mkdir -p "$pkgdir"
           cp -a build/bin/. "$pkgdir/"
-          tar -cJf llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz "$pkgdir"
+          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz "$pkgdir"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -434,7 +434,7 @@ jobs:
           pkgdir="llama-${{ steps.tag.outputs.name }}"
           mkdir -p "$pkgdir"
           cp -a build/bin/. "$pkgdir/"
-          tar -cJf llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz "$pkgdir"
+          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz "$pkgdir"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -949,7 +949,7 @@ jobs:
     permissions:
         contents: write # for creating release
 
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
 
     needs:
       - windows-cpu
@@ -972,12 +972,41 @@ jobs:
         id: tag
         uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
 
-      - name: Download artifacts
-        id: download-artifact
+      # Downloaded in batches rather than one call: actions/download-artifact
+      # starts every matched artifact concurrently, and 28 parallel extractions
+      # of ~14 GB stalls the runner.
+      - name: Download artifacts (backends)
         uses: actions/download-artifact@v7
         with:
+          pattern: llama-bin-*
           path: ./artifact
           merge-multiple: true
+
+      - name: Download artifacts (Ubuntu CUDA x64)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-ubuntu-cuda-*-x64.tar.xz
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Download artifacts (Ubuntu CUDA arm64)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-ubuntu-cuda-*-arm64.tar.xz
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Download artifacts (Windows CUDA)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-windows-cuda-*
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Report downloaded artifacts
+        run: |
+          ls -la artifact
+          df -h .
 
       - name: Move artifacts
         id: move_artifacts
