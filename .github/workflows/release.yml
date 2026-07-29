@@ -162,7 +162,43 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          sudo apt-get install -y cuda-toolkit-12-9 cmake ninja-build patchelf
+          # Install only the components this build actually consumes rather than
+          # the cuda-toolkit-12-9 metapackage. That metapackage drags in Nsight
+          # Systems/Compute, cuFFT, cuSPARSE, cuSOLVER and NPP -- ~3.9 GB of
+          # archives per job, none of it compiled against or shipped. The subset
+          # below is ~1.2 GB and covers everything the Build, Bundle CUDA runtime
+          # libraries and Validate steps reference:
+          #   cuda-nvcc          the compiler (pulls cuda-crt, cuda-nvvm)
+          #   cuda-cudart-dev    libcudart + the libcuda.so stub (CUDA::cuda_driver)
+          #   cuda-cccl          thrust/cub headers included by ggml-cuda
+          #   libcublas-dev      libcublas + libcublasLt
+          #   libcurand-dev      bundled and asserted on by Validate
+          #   libnvjitlink-dev   bundled and asserted on by Validate
+          # The -dev packages depend on their runtime counterparts, and
+          # cuda-toolkit-12-9-config-common (a transitive dep) is what creates the
+          # /usr/local/cuda -> /usr/local/cuda-12.9 alternative used below.
+          sudo apt-get install -y \
+            cuda-nvcc-12-9 \
+            cuda-cudart-dev-12-9 \
+            cuda-cccl-12-9 \
+            libcublas-dev-12-9 \
+            libcurand-dev-12-9 \
+            libnvjitlink-dev-12-9 \
+            cmake ninja-build patchelf
+
+          # Fail here, with the name of the missing file, rather than partway
+          # through the compile if NVIDIA ever repackages one of these out from
+          # under the hand-picked list above.
+          for f in /usr/local/cuda/bin/nvcc \
+                   /usr/local/cuda/include/cublas_v2.h \
+                   /usr/local/cuda/include/cub/cub.cuh \
+                   /usr/local/cuda/lib64/libcudart.so \
+                   /usr/local/cuda/lib64/libcublas.so \
+                   /usr/local/cuda/lib64/libcublasLt.so \
+                   /usr/local/cuda/lib64/libcurand.so \
+                   /usr/local/cuda/lib64/libnvJitLink.so; do
+            [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
+          done
 
       - name: Set CUDA environment
         run: |
@@ -276,7 +312,7 @@ jobs:
           pkgdir="llama-${{ steps.tag.outputs.name }}"
           mkdir -p "$pkgdir"
           cp -a build/bin/. "$pkgdir/"
-          tar -cJf llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz "$pkgdir"
+          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz "$pkgdir"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -320,7 +356,31 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          sudo apt-get install -y cuda-toolkit-12-9 cmake ninja-build patchelf
+          # See the x86_64 job above for why this is a hand-picked subset rather
+          # than the cuda-toolkit-12-9 metapackage. On sbsa the metapackage is
+          # ~3.3 GB of archives; this subset is ~1.2 GB.
+          sudo apt-get install -y \
+            cuda-nvcc-12-9 \
+            cuda-cudart-dev-12-9 \
+            cuda-cccl-12-9 \
+            libcublas-dev-12-9 \
+            libcurand-dev-12-9 \
+            libnvjitlink-dev-12-9 \
+            cmake ninja-build patchelf
+
+          # Fail here, with the name of the missing file, rather than partway
+          # through the compile if NVIDIA ever repackages one of these out from
+          # under the hand-picked list above.
+          for f in /usr/local/cuda/bin/nvcc \
+                   /usr/local/cuda/include/cublas_v2.h \
+                   /usr/local/cuda/include/cub/cub.cuh \
+                   /usr/local/cuda/lib64/libcudart.so \
+                   /usr/local/cuda/lib64/libcublas.so \
+                   /usr/local/cuda/lib64/libcublasLt.so \
+                   /usr/local/cuda/lib64/libcurand.so \
+                   /usr/local/cuda/lib64/libnvJitLink.so; do
+            [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
+          done
 
       - name: Set CUDA environment
         run: |
@@ -434,7 +494,7 @@ jobs:
           pkgdir="llama-${{ steps.tag.outputs.name }}"
           mkdir -p "$pkgdir"
           cp -a build/bin/. "$pkgdir/"
-          tar -cJf llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz "$pkgdir"
+          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz "$pkgdir"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -949,7 +1009,7 @@ jobs:
     permissions:
         contents: write # for creating release
 
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
 
     needs:
       - windows-cpu
@@ -972,12 +1032,41 @@ jobs:
         id: tag
         uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
 
-      - name: Download artifacts
-        id: download-artifact
+      # Downloaded in batches rather than one call: actions/download-artifact
+      # starts every matched artifact concurrently, and 28 parallel extractions
+      # of ~14 GB stalls the runner.
+      - name: Download artifacts (backends)
         uses: actions/download-artifact@v7
         with:
+          pattern: llama-bin-*
           path: ./artifact
           merge-multiple: true
+
+      - name: Download artifacts (Ubuntu CUDA x64)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-ubuntu-cuda-*-x64.tar.xz
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Download artifacts (Ubuntu CUDA arm64)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-ubuntu-cuda-*-arm64.tar.xz
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Download artifacts (Windows CUDA)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-windows-cuda-*
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Report downloaded artifacts
+        run: |
+          ls -la artifact
+          df -h .
 
       - name: Move artifacts
         id: move_artifacts
