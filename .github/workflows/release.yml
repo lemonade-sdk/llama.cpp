@@ -51,6 +51,11 @@ jobs:
         with:
           key: ubuntu-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
+          # A ROCm build compiles every TU for 23-27 gfx targets, so the object
+          # set is several times larger than the action's 500MB default. At 500MB
+          # ccache evicts (Cleanups) mid-build and never stays warm across runs,
+          # turning a ~15min cached build into 2h+. 2G holds the full set.
+          max-size: "2G"
 
       - name: Dependencies
         id: depends
@@ -746,6 +751,9 @@ jobs:
         with:
           key: windows-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
+          # Same reasoning as ubuntu-22-rocm: keep the multi-arch object set from
+          # overflowing the 500MB default and thrashing the cache across runs.
+          max-size: "2G"
 
       - name: Install ROCm with Wheels
         if: steps.cache-rocm.outputs.cache-hit != 'true'
