@@ -98,6 +98,7 @@ jobs:
         run: |
           cmake -B build -S . \
             -DCMAKE_HIP_COMPILER="$(hipconfig -l)/clang" \
+            -DCMAKE_HIP_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release \
             -DGGML_BACKEND_DL=ON \
             -DGGML_NATIVE=OFF \
@@ -817,6 +818,7 @@ jobs:
           cmake .. `
             -G "Unix Makefiles" `
             -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
+            -DCMAKE_HIP_COMPILER_LAUNCHER=ccache `
             -DCMAKE_BUILD_TYPE=Release `
             -DGGML_BACKEND_DL=ON `
             -DGGML_NATIVE=OFF `
