@@ -9,6 +9,11 @@ on:
         description: 'Create new release'
         required: true
         type: boolean
+      llama_ref:
+        description: 'Upstream ggml-org/llama.cpp tag to build (must match lemonade backend_versions.json)'
+        required: false
+        default: 'b9747'
+        type: string
   pull_request: # validate the release build on PRs; the release job is skipped so nothing is published
     paths:
       # The build jobs clone llama.cpp source from upstream and the get-tag-name
@@ -23,6 +28,12 @@ concurrency:
 env:
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
   CMAKE_ARGS: "-DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON"
+  # Upstream ref every job checks out. Empty on schedule/PR (no inputs) so
+  # actions/checkout uses ggml-org's default branch = latest — this preserves the
+  # fork's original "track upstream" nightly behavior. A manual dispatch defaults
+  # to the llama_ref input (b9747) so a deliberate build matches lemonade's
+  # backend_versions.json pin.
+  LLAMA_REF: ${{ github.event.inputs.llama_ref }}
 
 jobs:
   ubuntu-24-rocm:
@@ -47,6 +58,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -159,6 +171,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -353,6 +366,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -532,6 +546,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -658,6 +673,128 @@ jobs:
           path: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
           name: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
 
+  # ========================================================================
+  # musl (Alpine) — CPU. Upstream ggml-org ships only glibc ("ubuntu") Linux
+  # builds, so lemonade pulls musl CPU/Vulkan binaries from this fork instead.
+  # The source is cloned on the (glibc) host but compiled inside an Alpine
+  # container so it links musl. libstdc++/libgcc are linked statically and
+  # OpenMP is disabled so the tarball is self-contained (only musl libc, and
+  # for Vulkan libvulkan, are needed at runtime).
+  # ========================================================================
+  linux-musl-cpu:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+            cpu_variants: "ON"
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            cpu_variants: "OFF"
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
+
+      - name: Build (Alpine / musl)
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src alpine:latest sh -euxc '
+            apk add --no-cache build-base cmake git linux-headers
+            cmake -B build -S . \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DGGML_NATIVE=OFF \
+              -DGGML_BACKEND_DL=ON \
+              -DGGML_CPU_ALL_VARIANTS=${{ matrix.cpu_variants }} \
+              -DGGML_OPENMP=OFF \
+              -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON \
+              -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
+              ${{ env.CMAKE_ARGS }}
+            cmake --build build --config Release -j"$(nproc)"
+            chmod -R a+rwX build
+          '
+
+      - name: Determine tag name
+        id: tag
+        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+
+      - name: Pack artifacts
+        run: |
+          cp LICENSE ./build/bin/
+          tar -czvf llama-bin-linux-musl-${{ matrix.arch }}.tar.gz --transform "s,./,llama-${{ steps.tag.outputs.name }}/," -C ./build/bin .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          path: llama-bin-linux-musl-${{ matrix.arch }}.tar.gz
+          name: llama-bin-linux-musl-${{ matrix.arch }}.tar.gz
+
+  # ========================================================================
+  # musl (Alpine) — Vulkan. Needs vulkan-loader + a GLSL compiler at build;
+  # the target Alpine host must have vulkan-loader and a Vulkan driver (Mesa).
+  # ========================================================================
+  linux-musl-vulkan:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+            cpu_variants: "ON"
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            cpu_variants: "OFF"
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
+
+      - name: Build (Alpine / musl)
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src alpine:latest sh -euxc '
+            apk add --no-cache build-base cmake git linux-headers \
+              vulkan-loader-dev vulkan-headers glslang shaderc spirv-tools spirv-headers
+            cmake -B build -S . \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DGGML_NATIVE=OFF \
+              -DGGML_BACKEND_DL=ON \
+              -DGGML_CPU_ALL_VARIANTS=${{ matrix.cpu_variants }} \
+              -DGGML_OPENMP=OFF \
+              -DGGML_VULKAN=ON \
+              -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON \
+              -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
+              ${{ env.CMAKE_ARGS }}
+            cmake --build build --config Release -j"$(nproc)"
+            chmod -R a+rwX build
+          '
+
+      - name: Determine tag name
+        id: tag
+        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+
+      - name: Pack artifacts
+        run: |
+          cp LICENSE ./build/bin/
+          tar -czvf llama-bin-linux-musl-vulkan-${{ matrix.arch }}.tar.gz --transform "s,./,llama-${{ steps.tag.outputs.name }}/," -C ./build/bin .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          path: llama-bin-linux-musl-vulkan-${{ matrix.arch }}.tar.gz
+          name: llama-bin-linux-musl-vulkan-${{ matrix.arch }}.tar.gz
+
   windows-cpu:
     runs-on: windows-2025
 
@@ -673,6 +810,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -751,6 +889,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: Cache ROCm Installation
         id: cache-rocm
@@ -896,6 +1035,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -1040,6 +1180,8 @@ jobs:
       - ubuntu-22-cuda
       - ubuntu-22-cuda-arm64
       - ubuntu-22-openvino
+      - linux-musl-cpu
+      - linux-musl-vulkan
 
     steps:
       - name: Clone
@@ -1048,6 +1190,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ env.LLAMA_REF }}
 
       - name: Determine tag name
         id: tag
@@ -1277,6 +1420,10 @@ jobs:
                 '- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` (replace XX with your GPU compute capability)',
                 '- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` (replace XX with your GPU compute capability)',
                 `- [Ubuntu x64 (OpenVINO 2026.0)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-openvino-2026.0-x64.tar.gz)`,
+                `- [Alpine/musl x64 (CPU)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-linux-musl-x64.tar.gz)`,
+                `- [Alpine/musl arm64 (CPU)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-linux-musl-arm64.tar.gz)`,
+                `- [Alpine/musl x64 (Vulkan)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-linux-musl-vulkan-x64.tar.gz)`,
+                `- [Alpine/musl arm64 (Vulkan)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-linux-musl-vulkan-arm64.tar.gz)`,
                 '',
                 '**Windows:**',
                 `- [Windows x64 (ROCm 7.13)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-7.13-x64.zip)`,
