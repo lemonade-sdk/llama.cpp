@@ -1,0 +1,56 @@
+name: "Linux - Setup CUDA Toolkit"
+description: "Setup CUDA Toolkit for Linux"
+inputs:
+  arch:
+    description: "Target architecture (x64 or arm64)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Free disk space
+      shell: bash
+      run: |
+        sudo apt-get remove -y '^aspnetcore-.*' '^dotnet-.*' '^llvm-.*' 'php.*' 'ruby.*' \
+          google-cloud-cli azure-cli google-chrome-stable firefox powershell 2>/dev/null || true
+        sudo apt-get autoremove -y
+        df -h
+
+    - name: Install CUDA Toolkit
+      shell: bash
+      run: |
+        case "${{ inputs.arch }}" in
+          x64) repo_arch=x86_64 ;;
+          arm64) repo_arch=sbsa ;;
+          *) echo "::error::Unsupported arch '${{ inputs.arch }}' (expected x64 or arm64)"; exit 1 ;;
+        esac
+
+        wget -q "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${repo_arch}/cuda-keyring_1.1-1_all.deb"
+        sudo dpkg -i cuda-keyring_1.1-1_all.deb
+        sudo apt-get update
+        sudo apt-get install -y \
+          cuda-nvcc-12-9 \
+          cuda-cudart-dev-12-9 \
+          cuda-cccl-12-9 \
+          libcublas-dev-12-9 \
+          libcurand-dev-12-9 \
+          libnvjitlink-dev-12-9 \
+          cmake ninja-build patchelf
+
+        for f in /usr/local/cuda/bin/nvcc \
+                 /usr/local/cuda/include/cublas_v2.h \
+                 /usr/local/cuda/include/cub/cub.cuh \
+                 /usr/local/cuda/lib64/libcudart.so \
+                 /usr/local/cuda/lib64/libcublas.so \
+                 /usr/local/cuda/lib64/libcublasLt.so \
+                 /usr/local/cuda/lib64/libcurand.so \
+                 /usr/local/cuda/lib64/libnvJitLink.so; do
+          [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
+        done
+
+    - name: Set CUDA environment
+      shell: bash
+      run: |
+        echo "CUDA_PATH=/usr/local/cuda" >> "$GITHUB_ENV"
+        echo "/usr/local/cuda/bin" >> "$GITHUB_PATH"
+        echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
