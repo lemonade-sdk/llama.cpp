@@ -1021,6 +1021,9 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.arch == 'x64' && 'x64' || 'amd64_arm64' }}
           cmake -S . -B build -G "Ninja Multi-Config" ^
+            -DGGML_BACKEND_DL=ON ^
+            -DGGML_NATIVE=OFF ^
+            -DGGML_CPU=OFF ^
             -DGGML_CUDA=ON ^
             -DLLAMA_BUILD_BORINGSSL=ON ${{ matrix.defines }}
           set /A NINJA_JOBS=%NUMBER_OF_PROCESSORS%-1
@@ -1393,7 +1396,7 @@ jobs:
     needs: [check-release]
     if: ${{ needs.check-release.outputs.should_release == 'true' }}
 
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
 
     permissions:
       actions: write
@@ -1401,7 +1404,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        arch: [x64, arm64]
         sm: ["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121"]
+        include:
+          - arch: x64
+            os: ubuntu-22.04
+          - arch: arm64
+            os: ubuntu-22.04-arm
 
     steps:
       - name: Clone
@@ -1413,12 +1422,12 @@ jobs:
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
         with:
-          key: release-ubuntu-22.04-cuda-${{ matrix.sm }}
+          key: release-ubuntu-22.04-${{ matrix.arch }}-cuda-${{ matrix.sm }}
 
       - name: Setup CUDA Toolkit
         uses: ./.github/actions/linux-setup-cuda
         with:
-          arch: x64
+          arch: ${{ matrix.arch }}
 
       - name: Build
         run: |
@@ -1440,7 +1449,7 @@ jobs:
       - name: ccache-clear
         uses: ./.github/actions/ccache-clear
         with:
-          key: release-ubuntu-22.04-cuda-${{ matrix.sm }}
+          key: release-ubuntu-22.04-${{ matrix.arch }}-cuda-${{ matrix.sm }}
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -1507,7 +1516,7 @@ jobs:
               exit 1
             fi
 
-            missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
+            missing=$(LD_LIBRARY_PATH= ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
@@ -1526,158 +1535,13 @@ jobs:
           pkgdir="llama-${{ steps.tag.outputs.name }}"
           mkdir -p "$pkgdir"
           cp -a build/bin/. "$pkgdir/"
-          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz "$pkgdir"
+          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-${{ matrix.arch }}.tar.xz "$pkgdir"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          path: llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz
-          name: llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz
-
-  ubuntu-22-cuda-arm64:
-    needs: [check-release]
-    if: ${{ needs.check-release.outputs.should_release == 'true' }}
-
-    runs-on: ubuntu-22.04-arm
-
-    permissions:
-      actions: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        sm: ["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121"]
-
-    steps:
-      - name: Clone
-        id: checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
-        with:
-          key: release-ubuntu-22.04-arm64-cuda-${{ matrix.sm }}
-
-      - name: Setup CUDA Toolkit
-        uses: ./.github/actions/linux-setup-cuda
-        with:
-          arch: arm64
-
-      - name: Build
-        run: |
-          cmake_arch="${{ matrix.sm }}"
-          cmake_arch="${cmake_arch#sm_}"
-          cmake -B build -S . \
-            -DGGML_CUDA=ON \
-            -DCMAKE_CUDA_ARCHITECTURES="${cmake_arch}" \
-            -DBUILD_SHARED_LIBS=ON \
-            -DGGML_NATIVE=OFF \
-            -DGGML_BACKEND_DL=ON \
-            -DGGML_OPENMP=OFF \
-            -DGGML_STATIC=OFF \
-            -DLLAMA_BUILD_BORINGSSL=ON \
-            -DCMAKE_BUILD_TYPE=Release \
-            ${{ env.CMAKE_ARGS }}
-          cmake --build build --config Release -j $(nproc)
-
-      - name: ccache-clear
-        uses: ./.github/actions/ccache-clear
-        with:
-          key: release-ubuntu-22.04-arm64-cuda-${{ matrix.sm }}
-
-      - name: Bundle CUDA runtime libraries
-        run: |
-          cuda_lib=/usr/local/cuda/lib64
-          cp -av ${cuda_lib}/libcudart.so*   build/bin/
-          cp -av ${cuda_lib}/libcublas.so*   build/bin/
-          cp -av ${cuda_lib}/libcublasLt.so* build/bin/
-          cp -av ${cuda_lib}/libcurand.so*   build/bin/
-          cp -av ${cuda_lib}/libnvJitLink.so* build/bin/
-
-      - name: Set RPATH for portable distribution
-        run: |
-          for f in build/bin/*; do
-            [ -f "$f" ] && ! [ -L "$f" ] || continue
-            if file "$f" | grep -q 'ELF'; then
-              patchelf --set-rpath '$ORIGIN' "$f"
-            fi
-          done
-
-      - name: Validate CUDA package contents
-        run: |
-          shopt -s nullglob
-
-          required_libs=(
-            libcudart.so
-            libcublas.so
-            libcublasLt.so
-            libcurand.so
-            libnvJitLink.so
-          )
-          for lib in "${required_libs[@]}"; do
-            matches=(build/bin/${lib}*)
-            if [ ${#matches[@]} -eq 0 ]; then
-              echo "::error::Missing required CUDA runtime library matching ${lib}*"
-              exit 1
-            fi
-          done
-
-          smoke_bin=""
-          if [ -x build/bin/llama-cli ]; then
-            smoke_bin=build/bin/llama-cli
-          elif [ -x build/bin/llama-server ]; then
-            smoke_bin=build/bin/llama-server
-          else
-            smoke_bin=$(find build/bin -maxdepth 1 -type f -name 'llama-*' -perm -111 | head -n 1)
-          fi
-
-          if [ -z "$smoke_bin" ]; then
-            echo "::error::No llama executable found for smoke testing"
-            exit 1
-          fi
-
-          "$smoke_bin" --version >/dev/null
-
-          for f in build/bin/*; do
-            [ -f "$f" ] && ! [ -L "$f" ] || continue
-            if ! file "$f" | grep -q 'ELF'; then
-              continue
-            fi
-
-            rpath=$(patchelf --print-rpath "$f")
-            if [ "$rpath" != '$ORIGIN' ]; then
-              echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
-            fi
-
-            missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
-            if [ -n "$missing" ]; then
-              echo "::error::Unresolved runtime dependencies for $f"
-              echo "$missing"
-              exit 1
-            fi
-          done
-
-      - name: Determine tag name
-        id: tag
-        uses: ./.github/actions/get-tag-name
-
-      - name: Pack artifacts
-        id: pack_artifacts
-        run: |
-          cp LICENSE ./build/bin/
-          pkgdir="llama-${{ steps.tag.outputs.name }}"
-          mkdir -p "$pkgdir"
-          cp -a build/bin/. "$pkgdir/"
-          tar -I 'xz -T0' -cf llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz "$pkgdir"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          path: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
-          name: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
+          path: llama-ubuntu-cuda-${{ matrix.sm }}-${{ matrix.arch }}.tar.xz
+          name: llama-ubuntu-cuda-${{ matrix.sm }}-${{ matrix.arch }}.tar.xz
 
   ios-xcode:
     needs: [check-release]
@@ -1854,7 +1718,6 @@ jobs:
       - windows-sycl
       - windows-rocm
       - ubuntu-22-cuda
-      - ubuntu-22-cuda-arm64
       - windows-openvino
       - ubuntu-24-rocm
       - ubuntu-cpu
@@ -1903,6 +1766,20 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           pattern: llama-ubuntu-cuda-*-arm64.tar.xz
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Download artifacts (Windows CUDA runtime)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: cudart-llama-bin-win-cuda-*
+          path: ./artifact
+          merge-multiple: true
+
+      - name: Download artifacts (iOS xcframework)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: llama-*-xcframework.zip
           path: ./artifact
           merge-multiple: true
 
