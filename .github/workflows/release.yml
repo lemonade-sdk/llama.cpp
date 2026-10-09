@@ -522,12 +522,16 @@ jobs:
           path: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
           name: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
 
-  ubuntu-22-openvino:
-    runs-on: ubuntu-22.04
+  ubuntu-24-openvino:
+    # Ubuntu 24.04 + OpenVINO 2026.4.1 is the configuration upstream builds the
+    # OpenVINO backend on. The backend tracks the OpenVINO API closely (e.g.
+    # ov::ProfilingInfo::start_time, added in 2026.4), so this pin has to move
+    # with upstream or the build breaks.
+    runs-on: ubuntu-24.04
 
     env:
-      OPENVINO_VERSION_MAJOR: "2026.0"
-      OPENVINO_VERSION_FULL: "2026.0.0.20965.c6d6a13a886"
+      OPENVINO_VERSION_MAJOR: "2026.4.1"
+      OPENVINO_VERSION_FULL: "2026.4.1.22982.07f9c262b05"
 
     steps:
       - name: Clone
@@ -540,11 +544,12 @@ jobs:
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
         with:
-          key: ubuntu-openvino
+          key: ubuntu-24-openvino
           evict-old-files: 1d
 
       - name: Dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build patchelf \
             python3-pip libtbb12 \
             ocl-icd-opencl-dev opencl-headers opencl-clhpp-headers intel-opencl-icd
@@ -555,6 +560,7 @@ jobs:
           path: ${{ github.workspace }}/openvino
           version_major: ${{ env.OPENVINO_VERSION_MAJOR }}
           version_full: ${{ env.OPENVINO_VERSION_FULL }}
+          ubuntu_version: ubuntu24
 
       - name: Install OpenVINO dependencies
         run: |
@@ -1047,7 +1053,7 @@ jobs:
       - ubuntu-24-rocm
       - ubuntu-22-cuda
       - ubuntu-22-cuda-arm64
-      - ubuntu-22-openvino
+      - ubuntu-24-openvino
 
     steps:
       - name: Clone
@@ -1285,7 +1291,7 @@ jobs:
                 `- [Ubuntu x64 (ROCm 10.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-rocm-10.1-x64.tar.gz)`,
                 '- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` (replace XX with your GPU compute capability)',
                 '- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` (replace XX with your GPU compute capability)',
-                `- [Ubuntu x64 (OpenVINO 2026.0)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-openvino-2026.0-x64.tar.gz)`,
+                `- [Ubuntu x64 (OpenVINO 2026.4.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-openvino-2026.4.1-x64.tar.gz)`,
                 '',
                 '**Windows:**',
                 `- [Windows x64 (ROCm 7.14)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-7.14-x64.zip)`,
