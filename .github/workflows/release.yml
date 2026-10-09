@@ -522,16 +522,20 @@ jobs:
           path: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
           name: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
 
-  ubuntu-24-openvino:
-    # Ubuntu 24.04 + OpenVINO 2026.4.1 is the configuration upstream builds the
-    # OpenVINO backend on. The backend tracks the OpenVINO API closely (e.g.
-    # ov::ProfilingInfo::start_time, added in 2026.4), so this pin has to move
-    # with upstream or the build breaks.
-    runs-on: ubuntu-24.04
+  ubuntu-openvino:
+    # Two Ubuntu baselines:
+    # 24.04 is what upstream builds and validates the OpenVINO backend on,
+    # 22.04 keeps a glibc 2.35 binary for users on older distros.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            ubuntu: "22"
+          - os: ubuntu-24.04
+            ubuntu: "24"
 
-    env:
-      OPENVINO_VERSION_MAJOR: "2026.4.1"
-      OPENVINO_VERSION_FULL: "2026.4.1.22982.07f9c262b05"
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Clone
@@ -541,10 +545,44 @@ jobs:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
 
+      # The ggml-openvino backend is written against a specific OpenVINO release and uses APIs as soon as they land.
+      # So a hand-maintained pin here silently rots and breaks the build the moment upstream moves.
+      # Read the version out of the upstream workflow we just cloned instead, so this job always builds with the toolkit upstream built with.
+      # If upstream ever restructures that file this step fails loudly rather
+      # than falling back to a stale version and producing a confusing
+      # compile error a few hundred lines into the build.
+      - name: Resolve OpenVINO version from upstream
+        id: openvino_version
+        run: |
+          upstream_workflow=.github/workflows/release.yml
+          major=$(grep -oP 'OPENVINO_VERSION_MAJOR:\s*"\K[^"]+' "$upstream_workflow" | sort -u || true)
+          full=$(grep -oP 'OPENVINO_VERSION_FULL:\s*"\K[^"]+' "$upstream_workflow" | sort -u || true)
+
+          if [ "$(printf '%s' "$major" | grep -c .)" -ne 1 ] || [ "$(printf '%s' "$full" | grep -c .)" -ne 1 ]; then
+            echo "::error::Could not resolve a single OpenVINO version from upstream $upstream_workflow."
+            echo "::error::OPENVINO_VERSION_MAJOR candidates: ${major:-<none>}"
+            echo "::error::OPENVINO_VERSION_FULL candidates: ${full:-<none>}"
+            echo "::error::Upstream probably renamed these variables or split the OpenVINO jobs across files — update this step."
+            exit 1
+          fi
+
+          # The toolkit URL is <major>/linux/openvino_toolkit_<ubuntuNN>_<full>, so a major that is not a prefix of full means we would download a 404.
+          case "$full" in
+            "$major".*) ;;
+            *)
+              echo "::error::OpenVINO version mismatch upstream: full '$full' is not a build of major '$major'."
+              exit 1
+              ;;
+          esac
+
+          echo "Building against OpenVINO $full (as pinned by upstream)"
+          echo "OPENVINO_VERSION_MAJOR=$major" >> "$GITHUB_ENV"
+          echo "OPENVINO_VERSION_FULL=$full" >> "$GITHUB_ENV"
+
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
         with:
-          key: ubuntu-24-openvino
+          key: ubuntu-${{ matrix.ubuntu }}-openvino
           evict-old-files: 1d
 
       - name: Dependencies
@@ -560,7 +598,7 @@ jobs:
           path: ${{ github.workspace }}/openvino
           version_major: ${{ env.OPENVINO_VERSION_MAJOR }}
           version_full: ${{ env.OPENVINO_VERSION_FULL }}
-          ubuntu_version: ubuntu24
+          ubuntu_version: ubuntu${{ matrix.ubuntu }}
 
       - name: Install OpenVINO dependencies
         run: |
@@ -658,15 +696,15 @@ jobs:
       - name: Pack artifacts
         run: |
           cp LICENSE ./build/bin/
-          tar -czvf llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz \
+          tar -czvf llama-bin-ubuntu-${{ matrix.ubuntu }}-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz \
             --transform "s,./,llama-${{ steps.tag.outputs.name }}/," \
             -C ./build/bin .
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          path: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
-          name: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
+          path: llama-bin-ubuntu-${{ matrix.ubuntu }}-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
+          name: llama-bin-ubuntu-${{ matrix.ubuntu }}-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
 
   windows-cpu:
     runs-on: windows-2025
@@ -1053,7 +1091,7 @@ jobs:
       - ubuntu-24-rocm
       - ubuntu-22-cuda
       - ubuntu-22-cuda-arm64
-      - ubuntu-24-openvino
+      - ubuntu-openvino
 
     steps:
       - name: Clone
@@ -1202,7 +1240,9 @@ jobs:
           declare -A family_glob=(
             [cuda]="release/llama-${TAG}-*cuda-sm_*"
             [rocm]="release/llama-${TAG}-bin-*rocm-*"
-            [openvino]="release/llama-${TAG}-bin-*openvino-*"
+            # The two Ubuntu baselines are separate families targetting different glibc versions.
+            [openvino-22]="release/llama-${TAG}-bin-ubuntu-22-openvino-*"
+            [openvino-24]="release/llama-${TAG}-bin-ubuntu-24-openvino-*"
             [cpu]="release/llama-${TAG}-bin-win-cpu-*"
           )
 
@@ -1228,7 +1268,8 @@ jobs:
 
           check_glob rocm "release/llama-${TAG}-bin-ubuntu-rocm-*-x64.tar.gz"
           check_glob rocm "release/llama-${TAG}-bin-win-rocm-*-x64.zip"
-          check_glob openvino "release/llama-${TAG}-bin-ubuntu-openvino-*-x64.tar.gz"
+          check_glob openvino-22 "release/llama-${TAG}-bin-ubuntu-22-openvino-*-x64.tar.gz"
+          check_glob openvino-24 "release/llama-${TAG}-bin-ubuntu-24-openvino-*-x64.tar.gz"
           check_glob cpu "release/llama-${TAG}-bin-win-cpu-x64.zip"
 
           missing=0
@@ -1272,6 +1313,20 @@ jobs:
           script: |
             const tag = process.env.TAG_NAME;
             const { owner, repo } = context.repo;
+
+            // The OpenVINO version is resolved from upstream at build time, so it is not known here.
+            // Derive the download links from the files that were actually staged for this release
+            // instead of hardcoding a version that would go stale (or 404) the next time it moves.
+            const fs = require('fs');
+            const openvinoLinks = (fs.existsSync('release') ? fs.readdirSync('release') : [])
+              .filter(f => f.includes('-openvino-') && f.endsWith('.tar.gz'))
+              .sort()
+              .map(f => {
+                const m = f.match(/-bin-ubuntu-(\d+)-openvino-(.+)-x64\.tar\.gz$/);
+                const label = m ? `Ubuntu ${m[1]}.04 x64 (OpenVINO ${m[2]})` : f;
+                return `- [${label}](https://github.com/${owner}/${repo}/releases/download/${tag}/${f})`;
+              });
+
             let release;
             try {
               release = (await github.rest.repos.getReleaseByTag({ owner, repo, tag })).data;
@@ -1291,7 +1346,7 @@ jobs:
                 `- [Ubuntu x64 (ROCm 10.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-rocm-10.1-x64.tar.gz)`,
                 '- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` (replace XX with your GPU compute capability)',
                 '- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` (replace XX with your GPU compute capability)',
-                `- [Ubuntu x64 (OpenVINO 2026.4.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-openvino-2026.4.1-x64.tar.gz)`,
+                ...openvinoLinks,
                 '',
                 '**Windows:**',
                 `- [Windows x64 (ROCm 7.14)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-7.14-x64.zip)`,
