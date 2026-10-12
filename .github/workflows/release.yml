@@ -111,6 +111,7 @@ jobs:
       - name: Build with native CMake HIP support
         id: cmake_build
         run: |
+          set -o pipefail
           cmake -B build -S . \
             -DCMAKE_HIP_COMPILER="$(hipconfig -l)/clang" \
             -DCMAKE_BUILD_TYPE=Release \
@@ -124,8 +125,28 @@ jobs:
             -DHIP_PLATFORM=amd \
             -DGGML_HIP_ROCWMMA_FATTN=ON \
             -DGGML_OPENMP=ON \
-            ${{ env.CMAKE_ARGS }}
+            ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Determine tag name
         id: tag
@@ -230,6 +251,7 @@ jobs:
         run: |
           cmake_arch="${{ matrix.sm }}"
           cmake_arch="${cmake_arch#sm_}"
+          set -o pipefail
           cmake -B build -S . \
             -DGGML_CUDA=ON \
             -DCMAKE_CUDA_ARCHITECTURES="${cmake_arch}" \
@@ -240,8 +262,28 @@ jobs:
             -DGGML_STATIC=OFF \
             -DLLAMA_BUILD_BORINGSSL=ON \
             -DCMAKE_BUILD_TYPE=Release \
-            ${{ env.CMAKE_ARGS }}
+            ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -412,6 +454,7 @@ jobs:
         run: |
           cmake_arch="${{ matrix.sm }}"
           cmake_arch="${cmake_arch#sm_}"
+          set -o pipefail
           cmake -B build -S . \
             -DGGML_CUDA=ON \
             -DCMAKE_CUDA_ARCHITECTURES="${cmake_arch}" \
@@ -422,8 +465,28 @@ jobs:
             -DGGML_STATIC=OFF \
             -DLLAMA_BUILD_BORINGSSL=ON \
             -DCMAKE_BUILD_TYPE=Release \
-            ${{ env.CMAKE_ARGS }}
+            ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -608,6 +671,7 @@ jobs:
       - name: Build
         run: |
           source ${{ github.workspace }}/openvino/setupvars.sh
+          set -o pipefail
           cmake -B build -S . \
             -DGGML_OPENVINO=ON \
             -DBUILD_SHARED_LIBS=ON \
@@ -617,8 +681,28 @@ jobs:
             -DGGML_STATIC=OFF \
             -DLLAMA_BUILD_BORINGSSL=ON \
             -DCMAKE_BUILD_TYPE=Release \
-            ${{ env.CMAKE_ARGS }}
+            ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Bundle OpenVINO runtime libraries
         run: |
@@ -744,8 +828,31 @@ jobs:
             -DGGML_BACKEND_DL=ON ^
             -DGGML_CPU_ALL_VARIANTS=${{ matrix.arch == 'x64' && 'ON' || 'OFF' }} ^
             -DGGML_OPENMP=ON ^
-            ${{ env.CMAKE_ARGS }}
+            ${{ env.CMAKE_ARGS }} > cmake-configure.log 2>&1
+          set CMAKE_STATUS=%ERRORLEVEL%
+          type cmake-configure.log
+          if not "%CMAKE_STATUS%"=="0" exit /b %CMAKE_STATUS%
           cmake --build build --config Release
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Pack artifacts
         id: pack_artifacts
@@ -879,6 +986,7 @@ jobs:
         run: |
           mkdir build
           cd build
+          $ErrorActionPreference = 'Continue'
           cmake .. `
             -G "Unix Makefiles" `
             -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
@@ -894,8 +1002,31 @@ jobs:
             -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
             -DHIP_PATH="${env:HIP_PATH}" `
             -DGGML_HIP_ROCWMMA_FATTN=ON `
-            -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}"
+            -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}" 2>&1 | Tee-Object -FilePath cmake-configure.log
+          $cmakeStatus = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          if ($cmakeStatus -ne 0) { exit $cmakeStatus }
           cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < build/cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Verify HIP backend was built
         run: |
@@ -978,8 +1109,31 @@ jobs:
             -DGGML_NATIVE=OFF ^
             -DGGML_BACKEND_DL=ON ^
             -DLLAMA_BUILD_BORINGSSL=ON ^
-            ${{ env.CMAKE_ARGS }}
+            ${{ env.CMAKE_ARGS }} > cmake-configure.log 2>&1
+          set CMAKE_STATUS=%ERRORLEVEL%
+          type cmake-configure.log
+          if not "%CMAKE_STATUS%"=="0" exit /b %CMAKE_STATUS%
           cmake --build build --config Release
+
+      - name: Verify CMake options still exist upstream
+        shell: bash
+        run: |
+          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+          if [ -z "$unused" ]; then
+            echo "Every CMake option this workflow passes is still recognized by upstream."
+            exit 0
+          fi
+          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+          if [ -n "$foreign" ]; then
+            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+          fi
+          if [ -n "$dropped" ]; then
+            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
+            printf '::error::  -D%s\n' $dropped
+            exit 1
+          fi
+          echo "No llama.cpp/ggml options were dropped."
 
       - name: Download CPU backend artifact
         uses: actions/download-artifact@v7
@@ -1100,6 +1254,32 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+
+      # Surface the difference between upstream's shared release flags and ours on every run.
+      # Options upstream *removes* are caught, and failed on, by the "Verify CMake options still exist upstream" step in each build job.
+      - name: Report upstream CMake arg drift
+        run: |
+          ours=$(printf '%s\n' ${{ env.CMAKE_ARGS }} | sort -u)
+          theirs=$(grep -oP '^\s*CMAKE_ARGS:\s*"\K[^"]+' .github/workflows/release.yml | head -n1 | tr ' ' '\n' | grep . | sort -u)
+
+          if [ -z "$theirs" ]; then
+            echo "::warning::Could not read CMAKE_ARGS from upstream's release workflow — upstream may have restructured it. Skipping the drift comparison."
+            exit 0
+          fi
+
+          added=$(comm -13 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
+          removed=$(comm -23 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
+
+          if [ -z "$added" ] && [ -z "$removed" ]; then
+            echo "Shared CMake args match upstream exactly."
+            exit 0
+          fi
+          if [ -n "$added" ]; then
+            printf '::warning::Upstream release builds pass %s but this workflow does not. Consider whether these artifacts should too.\n' $added
+          fi
+          if [ -n "$removed" ]; then
+            printf '::warning::This workflow passes %s but upstream release builds do not. Consider whether it is wanted.\n' $removed
+          fi
 
       - name: Determine tag name
         id: tag
@@ -1256,11 +1436,11 @@ jobs:
 
           # Each backend family is checked independently, but must be
           # published as a complete, internally-consistent set across every
-          # platform/variant it covers (e.g. all 7 CUDA sm_* builds for
+          # platform/variant it covers (e.g. all 8 CUDA sm_* builds for
           # ubuntu x64/arm64 and windows) — never a partial mix. A gap in one
           # family drops that whole family from the release; other families
           # are unaffected.
-          for sm in sm_75 sm_80 sm_86 sm_89 sm_90 sm_100 sm_120; do
+          for sm in sm_75 sm_80 sm_86 sm_89 sm_90 sm_100 sm_120 sm_121; do
             check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
             check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
             check_glob cuda "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
