@@ -1173,17 +1173,20 @@ jobs:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
 
-      # Surface the difference between upstream's shared release flags and ours on every run.
+      # Surface the difference between upstream's shared release flags and ours on every run (workflow-level CMAKE_ARGS only).
+      # Per-job flags are deliberately (packaging, backend selection) not compared against upstream's.
       # Options upstream *removes* are caught, and failed on, by the "Verify CMake options still exist upstream" step in each build job.
       - name: Report upstream CMake arg drift
         run: |
-          ours=$(printf '%s\n' ${{ env.CMAKE_ARGS }} | sort -u)
-          theirs=$(grep -oP '^\s*CMAKE_ARGS:\s*"\K[^"]+' .github/workflows/release.yml | head -n1 | tr ' ' '\n' | grep . | sort -u)
-
-          if [ -z "$theirs" ]; then
-            echo "::warning::Could not read CMAKE_ARGS from upstream's release workflow — upstream may have restructured it. Skipping the drift comparison."
+          # Two-space indent anchors this to the workflow-level env block, so a job-level CMAKE_ARGS override upstream can never be picked up instead.
+          theirs_raw=$(grep -oP '^  CMAKE_ARGS:\s*"\K[^"]+' .github/workflows/release.yml || true)
+          if [ "$(printf '%s' "$theirs_raw" | grep -c .)" -ne 1 ]; then
+            echo "::warning::Expected exactly one workflow-level CMAKE_ARGS in upstream's release workflow, found $(printf '%s' "$theirs_raw" | grep -c .) — upstream may have restructured it. Skipping the drift comparison."
             exit 0
           fi
+
+          ours=$(printf '%s\n' ${{ env.CMAKE_ARGS }} | sort -u)
+          theirs=$(printf '%s\n' $theirs_raw | sort -u)
 
           added=$(comm -13 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
           removed=$(comm -23 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
