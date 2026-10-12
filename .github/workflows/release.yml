@@ -702,6 +702,7 @@ jobs:
           fi
           "$smoke_bin" --version >/dev/null
 
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -711,17 +712,24 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
-            # libOpenCL is optional (Intel GPU acceleration); skip it
-            missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libOpenCL.so.1" { print }')
+            # Both of these come from the user's driver stack: libOpenCL from the GPU driver, libze_loader (level-zero) 
+            # OpenVINO only loads the device plugin from the Intel NPU driver. 
+            # that needs them when the matching driver is installed.
+            missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libOpenCL.so.1" && $1 != "libze_loader.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::OpenVINO package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
