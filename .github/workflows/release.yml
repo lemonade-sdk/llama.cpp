@@ -572,12 +572,10 @@ jobs:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
 
-      # The ggml-openvino backend is written against a specific OpenVINO release and uses APIs as soon as they land.
-      # So a hand-maintained pin here silently rots and breaks the build the moment upstream moves.
-      # Read the version out of the upstream workflow we just cloned instead, so this job always builds with the toolkit upstream built with.
-      # If upstream ever restructures that file this step fails loudly rather
-      # than falling back to a stale version and producing a confusing
-      # compile error a few hundred lines into the build.
+      # The ggml-openvino backend is written against a specific OpenVINO release.
+      # So a hand-maintained pin here silently breaks the build the moment upstream moves.
+      # Read the version out of the upstream workflow, so this job always builds with the toolkit upstream built with.
+      # If upstream ever restructures that file this step fails rather than falling back to a stale version.
       - name: Resolve OpenVINO version from upstream
         id: openvino_version
         run: |
