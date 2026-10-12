@@ -128,25 +128,13 @@ jobs:
             ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
 
       - name: Determine tag name
         id: tag
@@ -265,25 +253,13 @@ jobs:
             ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -468,25 +444,13 @@ jobs:
             ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -684,25 +648,13 @@ jobs:
             ${{ env.CMAKE_ARGS }} 2>&1 | tee cmake-configure.log
           cmake --build build --config Release -j $(nproc)
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
 
       - name: Bundle OpenVINO runtime libraries
         run: |
@@ -834,25 +786,13 @@ jobs:
           if not "%CMAKE_STATUS%"=="0" exit /b %CMAKE_STATUS%
           cmake --build build --config Release
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
 
       - name: Pack artifacts
         id: pack_artifacts
@@ -1008,25 +948,15 @@ jobs:
           if ($cmakeStatus -ne 0) { exit $cmakeStatus }
           cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < build/cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
+        with:
+          log: build/cmake-configure.log
 
       - name: Verify HIP backend was built
         run: |
@@ -1115,25 +1045,13 @@ jobs:
           if not "%CMAKE_STATUS%"=="0" exit /b %CMAKE_STATUS%
           cmake --build build --config Release
 
+      - name: Check out CI helpers
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
       - name: Verify CMake options still exist upstream
-        shell: bash
-        run: |
-          unused=$(tr -d '\r' < cmake-configure.log | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
-          if [ -z "$unused" ]; then
-            echo "Every CMake option this workflow passes is still recognized by upstream."
-            exit 0
-          fi
-          foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
-          dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
-          if [ -n "$foreign" ]; then
-            printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
-          fi
-          if [ -n "$dropped" ]; then
-            echo "::error::llama.cpp/ggml CMake options passed by this workflow no longer exist upstream (renamed or removed). The build silently dropped whatever they enabled:"
-            printf '::error::  -D%s\n' $dropped
-            exit 1
-          fi
-          echo "No llama.cpp/ggml options were dropped."
+        uses: ./lemonade-ci/.github/actions/check-cmake-options
 
       - name: Download CPU backend artifact
         uses: actions/download-artifact@v7
