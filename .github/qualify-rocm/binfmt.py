@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Read-only inspection of compiled binaries: which GPU chips they support, which
-libraries they need, and which version of the C library they require.
+Read-only inspection of compiled binaries: which gfx targets they support,
+which libraries they need, and which version of the C library they require.
 
 Background, because none of this is obvious from the outside.
 
@@ -11,20 +11,20 @@ the same kinds of information -- machine code, data, and a list of the other
 libraries the program needs -- just arranged differently. Both divide the file
 into named blocks called "sections".
 
-AMD makes many different GPU chips, and each one needs machine code built
-specifically for it. When llama.cpp's HIP backend is compiled it is asked to
-produce code for a whole list of chips at once (gfx1151, gfx1030, ...), and the
-result is a single "fat binary": one file with a stack of per-chip builds
-inside it. That is why the HIP backend is around a gigabyte while every other
-backend is a few megabytes.
+AMD GPUs come in different architectures, called gfx targets -- gfx1151,
+gfx1030, and so on. Each one needs machine code built specifically for it. When
+llama.cpp's HIP backend is compiled it is asked to produce code for a whole list
+of gfx targets at once, and the result is a single "fat binary": one file with a
+stack of per-target builds inside it. That is why the HIP backend is around a
+gigabyte while every other backend is a few megabytes.
 
 The problem this module exists to solve: if the compiler produces code for only
-some of the requested chips, NOTHING reports an error. The file is still
+some of the requested gfx targets, NOTHING reports an error. The file is still
 created, the build still succeeds, and the file still has the expected name. A
-user whose chip was dropped then runs llama.cpp, which looks for that chip's
-code, does not find it, and quietly falls back to the CPU -- much slower, with
-no error message anywhere. So the only way to know is to open the fat binary
-and count what is actually inside it.
+user whose gfx target was dropped then runs llama.cpp, which looks for code for
+their GPU, does not find it, and quietly falls back to the CPU -- much slower,
+with no error message anywhere. So the only way to know is to open the fat
+binary and count what is actually inside it.
 
 Everything here uses the Python standard library only, so it can run on any
 runner without installing a GPU toolchain.
@@ -35,20 +35,20 @@ import re
 import struct
 
 # ---------------------------------------------------------------------------
-# Counting the GPU chips inside a fat binary
+# Counting the gfx targets inside a fat binary
 # ---------------------------------------------------------------------------
 
-# Each per-chip build inside the fat binary is labelled with a plain readable
+# Each per-target build inside the fat binary is labelled with a plain readable
 # tag, stored as ordinary text right in the file. The tags look like this:
 #
 #     hip-amdgcn-amd-amdhsa--gfx1151
 #     |    |                   |
-#     |    |                   the GPU chip this build targets
+#     |    |                   the gfx target this build is for
 #     |    the AMD GPU platform the code was built for
 #     the kind of GPU offloading
 #
-# So finding every chip is simply a matter of searching the file's bytes for
-# that pattern and collecting the gfx names. The double dash is not a typo --
+# So finding every gfx target is simply a matter of searching the file's bytes
+# for that pattern and collecting the names. The double dash is not a typo --
 # it is an intentionally empty field in the middle of the platform name.
 #
 # Two details the pattern handles deliberately:
@@ -56,14 +56,14 @@ import struct
 #     different compiler versions spell it differently.
 #   * Requiring "amdgcn-amd-amdhsa" means only GPU builds match. The same file
 #     also contains a regular CPU build labelled with an Intel/AMD CPU platform
-#     name, and we do not want to count that as a GPU chip.
+#     name, and we do not want to count that as a gfx target.
 BUNDLE_ENTRY_RE = re.compile(rb"[a-z0-9_]+-amdgcn-amd-amdhsa-[-0-9a-zA-Z_.:+]*")
 
-# Marker text that begins each group of per-chip builds. Counted purely as a
+# Marker text that begins each group of per-target builds. Counted purely as a
 # sanity signal, so the report can show how many groups were found.
 BUNDLE_MAGIC = b"__CLANG_OFFLOAD_BUNDLE__"
 
-# Chip names look like gfx1151, gfx90a, gfx1030.
+# gfx target names look like gfx1151, gfx90a, gfx1030.
 _GFX_RE = re.compile(r"(gfx[0-9a-fA-F]+)")
 
 # The fat binary is around a gigabyte, so read it in pieces instead of loading
@@ -76,11 +76,11 @@ _OVERLAP = 256
 
 
 def strip_target_id(entry_id):
-    """Pull the chip name out of a tag.
+    """Pull the gfx target name out of a tag.
 
-    Some builds append extra hardware options to the chip name after a colon,
-    e.g. 'gfx90a:xnack+'. Those describe optional features, not a different
-    chip, so everything from the colon onward is discarded.
+    Some builds append extra hardware options after the name, separated by a
+    colon, e.g. 'gfx90a:xnack+'. Those describe optional features, not a
+    different target, so everything from the colon onward is discarded.
 
         'hip-amdgcn-amd-amdhsa--gfx90a:xnack+'  ->  'gfx90a'
     """
@@ -89,7 +89,7 @@ def strip_target_id(entry_id):
 
 
 def scan_offload_bundles(path):
-    """Search a binary for per-chip build tags.
+    """Search a binary for per-target build tags.
 
     Returns (how many times each tag appears, how many build groups were found,
     how many bytes were read).
@@ -150,18 +150,18 @@ def scan_offload_bundles(path):
 
 
 def audit_gfx_targets(path, expected):
-    """Check which GPU chips a fat binary actually contains code for.
+    """Check which gfx targets a fat binary actually contains code for.
 
-    `expected` is the list of chips the build was asked to produce, taken from
-    the build job itself so Linux and Windows are each compared against their
-    own list rather than a shared guess.
+    `expected` is the list of gfx targets the build was asked to produce, taken
+    from the build job itself so Linux and Windows are each compared against
+    their own list rather than a shared guess.
 
-    The returned dict reports which chips are present, which are missing, and
-    how many times each one appears. That last number is useful on its own:
-    the compiler emits one entry per source file it compiles, so in a healthy
-    build every chip has the SAME count. A chip with a noticeably lower count
-    was built into only part of the project, which a simple present/absent
-    check would miss entirely.
+    The returned dict reports which targets are present, which are missing, and
+    how many times each one appears. That last number is useful on its own: the
+    compiler emits one entry per source file it compiles, so in a healthy build
+    every target has the SAME count. A target with a noticeably lower count was
+    built into only part of the project, which a simple present/absent check
+    would miss entirely.
     """
     counts, magic, total = scan_offload_bundles(path)
     per_target = {}

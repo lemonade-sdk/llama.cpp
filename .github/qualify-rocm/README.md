@@ -16,7 +16,7 @@ broken still starts, still answers every request, and still returns correct
 answers. It is simply ten times slower, with no error anywhere.
 
 The same quietness applies further up. If the compiler produces GPU code for
-only some of the chips it was asked to cover, nothing reports an error — the
+only some of the gfx targets it was asked to cover, nothing reports an error — the
 output file is still created, with the expected name and a plausible size.
 
 Both of those ship green unless something deliberately looks inside the
@@ -44,7 +44,7 @@ been packaged.
 |---|---|---|
 | T0.1 | the binaries a user needs are all present | yes |
 | T0.2 | the GPU backend exists on both operating systems and is big enough to hold GPU code | yes |
-| T0.3 | the GPU backend really contains code for every chip the build asked for | yes |
+| T0.3 | the GPU backend really contains code for every gfx target the build asked for | yes |
 | T0.4 | the CPU backend variants are present | yes |
 | T0.5 | every library the archive needs is either inside it, part of the OS, or a ROCm library | yes |
 | T0.6 | the archive still runs on the oldest Linux release we support | yes |
@@ -82,10 +82,10 @@ otherwise shows up as occasional nonsense rather than a clean failure.
 
 ## How some of this works
 
-### Counting the GPU chips inside the backend
+### Counting the gfx targets inside the backend
 
 `binfmt.py` searches the GPU backend file for the short text labels the
-compiler writes next to each chip's code, rather than asking an AMD tool to
+compiler writes next to each gfx target's code, rather than asking an AMD tool to
 list them.
 
 The reason is that the GPU code lives in a named block inside the file, and
@@ -98,12 +98,12 @@ check can run on an ordinary runner against the archive we actually ship.
 
 Two deliberate behaviours:
 
-- Finding **no** chips at all is a failure, not a pass. A check that can
+- Finding **no** gfx targets at all is a failure, not a pass. A check that can
   silently come up empty is worse than no check.
-- The number of entries per chip is reported, not just which chips are present.
-  The compiler writes one entry per source file, so in a healthy build every
-  chip has the same count; a chip with a lower count was built into only part
-  of the project, which a present/absent check would miss.
+- The number of entries per target is reported, not just which targets are
+  present. The compiler writes one entry per source file, so in a healthy build
+  every target has the same count; a target with a lower count was built into
+  only part of the project, which a present/absent check would miss.
 
 ### Which ROCm the checks verify against
 
@@ -135,22 +135,22 @@ deliberately.
 
 ```bash
 # Check a downloaded release asset
-python3 .github/qualify/tier0_static.py \
+python3 .github/qualify-rocm/tier0_static.py \
     --archive llama-bNNNNN-bin-ubuntu-rocm-10.1-x64.tar.gz \
     --os ubuntu --rocm-version 10.1 \
     --gpu-targets "gfx900;gfx906;...;gfx1201" \
     --output tier0.json
 
 # Combine reports into one record per archive and decide what may ship
-python3 .github/qualify/aggregate.py \
+python3 .github/qualify-rocm/aggregate.py \
     --fragments-dir ./fragments --tag bNNNNN \
     --records-dir ./qualification --fail-on-no-promote
 ```
 
 Each run writes a `qualification-<archive>.json` record that is attached to the
-release. It lists which GPU chips the archive contains code for, which of them
+release. It lists which gfx targets the archive contains code for, which of them
 were actually tested on hardware, and the result of every check — so questions
-like "was this chip ever verified in that build?" stay answerable long after
+like "was this gfx target ever verified in that build?" stay answerable long after
 the CI logs have expired.
 
 ## Out of scope

@@ -15,8 +15,8 @@ Within one archive:
   - the static checks must be present and must pass.
   - the GPU checks must pass IF they ran. An archive with no GPU report is
     recorded as not hardware-validated rather than being failed -- each build
-    covers 20 or more GPU chips and only one of them has test hardware, so the
-    record states which is which instead of implying they are all equal.
+    covers 20 or more gfx targets and only one of them has test hardware, so
+    the record states which is which instead of implying they are all equal.
 
 With --fail-on-no-promote the exit code is non-zero if any version failed. The
 release job uses that to drop only the affected ROCm versions, leaving every

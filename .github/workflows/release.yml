@@ -15,7 +15,9 @@ on:
       # action is consumed via a pinned @lemonade ref, so only changes to this
       # workflow itself can affect the outcome of a PR run. Scope PR runs to it.
       - '.github/workflows/release.yml'
-      - '.github/qualify/**'
+      # The qualification suite decides whether the ROCm family ships, so a
+      # change to it must be validated the same way.
+      - '.github/qualify-rocm/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}
@@ -1129,7 +1131,7 @@ jobs:
           name: llama-windows-cuda-${{ matrix.sm }}-x64.7z
 
   # ---------------------------------------------------------------------------
-  # ROCm build qualification. See .github/qualify/README.md.
+  # ROCm build qualification. See .github/qualify-rocm/README.md.
   #
   # Tier 0 is static and runs on free hosted runners, including on PRs.
   # Tier 1 runs real inference on the gfx1151 self-hosted boxes.
@@ -1193,7 +1195,7 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          python .github/qualify/install_rocm.py \
+          python .github/qualify-rocm/install_rocm.py \
             --version "${{ matrix.rocm }}.0" \
             --arch gfx1151 \
             --prefix "${RUNNER_TEMP}/rocm-check" \
@@ -1206,7 +1208,7 @@ jobs:
           # No --fail-on-error here: every archive must produce a report even
           # when a check fails, so the release job's aggregate step sees the
           # whole picture. That step is the single gate.
-          python .github/qualify/tier0_static.py \
+          python .github/qualify-rocm/tier0_static.py \
             --meta "meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json" \
             --archive-dir ./artifact \
             --run-binaries \
@@ -1307,7 +1309,7 @@ jobs:
       - name: Install a user-style ROCm runtime
         shell: bash
         run: |
-          "$PY" .github/qualify/install_rocm.py \
+          "$PY" .github/qualify-rocm/install_rocm.py \
             --version "${{ matrix.rocm }}.0" \
             --arch gfx1151 \
             --prefix "${RUNNER_TEMP}/rocm-qual" \
@@ -1326,7 +1328,7 @@ jobs:
         run: |
           mkdir -p fragments
           # No --fail-on-error: the aggregate in the release job is the gate.
-          "$PY" .github/qualify/tier1_gpu.py \
+          "$PY" .github/qualify-rocm/tier1_gpu.py \
             --archive-root "$ARCHIVE_ROOT" \
             --model Qwen3-0.6B-Q4_0.gguf \
             --rocm-version "${{ matrix.rocm }}" \
@@ -1632,7 +1634,7 @@ jobs:
             if [[ "$base" == *-win-rocm-* ]]; then os=win; else os=ubuntu; fi
             ver=$(sed -E 's/.*-rocm-([0-9]+\.[0-9]+)-x64\..*/\1/' <<<"$base")
             echo "::group::Post-merge — $base"
-            python3 lemonade-ci/.github/qualify/check_post_merge.py \
+            python3 lemonade-ci/.github/qualify-rocm/check_post_merge.py \
               --archive "$archive" --os "$os" --rocm-version "$ver" --tag "$TAG" \
               --output "fragments/tier0-postmerge-$os-rocm-$ver.json" || true
             echo "::endgroup::"
@@ -1645,7 +1647,7 @@ jobs:
           TAG: ${{ steps.tag.outputs.name }}
         run: |
           mkdir -p qualification
-          python3 lemonade-ci/.github/qualify/aggregate.py \
+          python3 lemonade-ci/.github/qualify-rocm/aggregate.py \
             --fragments-dir ./fragments \
             --tag "$TAG" \
             --records-dir ./qualification \

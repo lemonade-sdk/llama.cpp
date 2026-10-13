@@ -13,8 +13,8 @@ Checks:
   T0.2  HIP backend present        -- ggml-hip exists on BOTH OSes and is
                                       large enough to contain GPU code.
   T0.3  gfx target audit           -- the GPU backend really contains code for
-                                      every chip the build asked for. See
-                                      binfmt.py for how and why.
+                                      every gfx target the build asked for.
+                                      See binfmt.py for how and why.
   T0.4  CPU backend variants       -- ggml-cpu-* present. On Windows after the
                                       release job's CPU merge this is also the
                                       proof that the merge landed.
@@ -541,12 +541,16 @@ def check_server_flags(root, os_name, run_binaries):
 
 
 def check_tag_consistency(archive, tops):
-    """The directory inside the archive should match the tag in its name.
+    """The folder inside the archive should match the tag in its name.
 
-    The build jobs and the release job each resolve the upstream
-    tag independently, so they drift when upstream moves between them. Lemonade
-    locates llama-server by recursive search so this is currently harmless to
-    it, but it makes "which build is this really?" unanswerable from the asset.
+    Every job in a release resolves its upstream revision from a single shared
+    value, so these two should always agree. If they ever stop agreeing, jobs
+    have gone back to resolving it independently -- which means they may also
+    have compiled different source, and the archive's name no longer tells you
+    what is inside it.
+
+    Non-gating: a mismatch does not make the binaries wrong, it makes their
+    provenance unclear.
     """
     asset = re.search(r"llama-(b\d+)-", os.path.basename(archive))
     inner = None
@@ -561,8 +565,8 @@ def check_tag_consistency(archive, tops):
         return (report.STATUS_SKIP, "no tag to compare (flat archive layout)", details)
     if asset.group(1) != inner:
         return (report.STATUS_WARN,
-                f"asset is named {asset.group(1)} but contains {inner}/ -- the build "
-                "job and the release job resolved different upstream tags", details)
+                f"asset is named {asset.group(1)} but contains {inner}/ -- the jobs "
+                "in this run did not all build the same upstream revision", details)
     return (report.STATUS_PASS, None, details)
 
 

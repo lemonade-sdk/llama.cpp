@@ -120,7 +120,7 @@ def build_env(rocm_dirs, exe_dir, gfx_target):
     joined = os.pathsep.join(rocm_dirs + [exe_dir])
     if os.name == "nt":
         env["PATH"] = joined + os.pathsep + env.get("PATH", "")
-        # Raises the shared-memory limit on these chips so larger models fit.
+        # Raises the shared-memory limit on these targets so larger models fit.
         if gfx_target in ("gfx1151", "gfx1152"):
             env["OCL_SET_SVM_SIZE"] = "262144"
     else:
