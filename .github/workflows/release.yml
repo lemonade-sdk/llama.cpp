@@ -1205,14 +1205,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p fragments
-          # No --fail-on-error here: every archive must produce a report even
-          # when a check fails, so the release job's aggregate step sees the
-          # whole picture. That step is the single gate.
+          # --fail-on-error makes THIS leg go red as soon as a check fails, which is the only signal a pull request gets.
+          # The release job and the aggregate that normally decides what ships does not run on PR's.
           python .github/qualify-rocm/tier0_static.py \
             --meta "meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json" \
             --archive-dir ./artifact \
             --run-binaries \
-            --output "fragments/tier0-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json" || true
+            --fail-on-error \
+            --output "fragments/tier0-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json"
 
       - name: Upload Tier 0 report
         if: always()
@@ -1223,18 +1223,21 @@ jobs:
           if-no-files-found: warn
 
   qualify-tier1:
-    # Hardware validation on gfx1151 (Strix Halo) runner.
-    # The qualification record says so explicitly rather than implying the rest were tested.
-    # Skipped on pull_request.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    # Hardware validation on the Strix Halo (gfx1151) runners.
+    # Only one of the 20+ gfx targets in a build has test hardware.
+    # The qualification record states that explicitly rather than implying the rest were tested too.
+    # Runs on every trigger -- schedule, manual dispatch and pull request -- EXCEPT a pull request opened from a fork.
+    if: >-
+      ${{ !cancelled() &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository) }}
     needs:
       - ubuntu-24-rocm
       - windows-rocm
 
     strategy:
       fail-fast: false
-      # 6 legs (3 ROCm versions x 2 OSes)
-      max-parallel: 2
+      # Six legs: three ROCm versions (7.14, 10.0, 10.1) on each of Windows and Linux.
       matrix:
         include:
           - os: ubuntu
@@ -1248,13 +1251,13 @@ jobs:
             runner: [stx-halo, Linux]
           - os: win
             rocm: "7.14"
-            runner: [stx-halo, Windows]
+            runner: [xsj-dispatch, strix-halo, Windows]
           - os: win
             rocm: "10.0"
-            runner: [stx-halo, Windows]
+            runner: [xsj-dispatch, strix-halo, Windows]
           - os: win
             rocm: "10.1"
-            runner: [stx-halo, Windows]
+            runner: [xsj-dispatch, strix-halo, Windows]
 
     runs-on: ${{ matrix.runner }}
 
@@ -1327,7 +1330,6 @@ jobs:
         shell: bash
         run: |
           mkdir -p fragments
-          # No --fail-on-error: the aggregate in the release job is the gate.
           "$PY" .github/qualify-rocm/tier1_gpu.py \
             --archive-root "$ARCHIVE_ROOT" \
             --model Qwen3-0.6B-Q4_0.gguf \
@@ -1335,7 +1337,8 @@ jobs:
             --gfx-target gfx1151 \
             --artifact "llama-bin-${{ matrix.os }}-rocm-${{ matrix.rocm }}-x64" \
             --logs-dir fragments \
-            --output "fragments/tier1-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json" || true
+            --fail-on-error \
+            --output "fragments/tier1-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json"
 
       - name: Upload Tier 1 fragments
         if: always()
