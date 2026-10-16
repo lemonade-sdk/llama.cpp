@@ -1,0 +1,45 @@
+name: "Check CMake options still exist upstream"
+description: >
+  Fails if a GGML_*/LLAMA_* option this workflow passes was renamed or removed upstream.
+  CMake does not treat an unknown -D option as an error.
+  It warns and builds on without it, so a release can quietly lose a feature while staying green.
+
+inputs:
+  log:
+    description: "Path to the captured CMake configure output"
+    required: false
+    default: "cmake-configure.log"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        log='${{ inputs.log }}'
+        if [ ! -f "$log" ]; then
+          echo "::error::CMake configure log '$log' not found — the build step should have captured it."
+          exit 1
+        fi
+
+        # CMake indents the offenders under this header, between two blank lines.
+        unused=$(tr -d '\r' < "$log" | awk '/Manually-specified variables were not used/{c=1;next} c{if(NF==0){if(s)c=0;next} s=1;sub(/^[[:space:]]+/,"");print}' | sort -u)
+        if [ -z "$unused" ]; then
+          echo "Every CMake option this workflow passes is still recognized by upstream."
+          exit 0
+        fi
+
+        # Only GGML_*/LLAMA_* options change what we ship - fail.
+        # Toolchain, ROCm and HIP variables are read by other CMake packages
+        # and get listed as unused in healthy builds — warn, don't fail.
+        foreign=$(printf '%s\n' "$unused" | grep -vE '^(GGML|LLAMA)_' || true)
+        dropped=$(printf '%s\n' "$unused" | grep -E '^(GGML|LLAMA)_' || true)
+
+        if [ -n "$foreign" ]; then
+          printf '::warning::CMake ignored -D%s — read by another CMake package, or no longer needed.\n' $foreign
+        fi
+        if [ -n "$dropped" ]; then
+          echo "::error::These CMake options no longer exist upstream (renamed or removed). The build silently dropped whatever those options enabled:"
+          printf '::error::  -D%s\n' $dropped
+          exit 1
+        fi
+        echo "No llama.cpp/ggml options were dropped."
