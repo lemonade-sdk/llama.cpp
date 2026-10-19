@@ -1314,8 +1314,13 @@ jobs:
       # script cleans up after itself on every normal exit; this is the backstop
       # for the paths it never gets to. Harmless on a machine that is discarded
       # after the job, and necessary on one that is not.
+      # continue-on-error because this is only a backstop: the script already
+      # stops the server itself on every path it reaches. If an earlier step
+      # failed badly enough that even the interpreter is missing, a red mark
+      # here adds noise on top of the real failure rather than information.
       - name: Tear down
         if: always()
+        continue-on-error: true
         shell: python
         run: |
           import subprocess, sys

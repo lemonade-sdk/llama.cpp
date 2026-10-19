@@ -52,6 +52,39 @@ def venv_python(venv_dir):
     return os.path.join(venv_dir, "bin", "python")
 
 
+def minimal_env(python):
+    """A copy of the environment with PATH cut down to what pip needs.
+
+    pip reads every directory on PATH while it installs, to work out whether
+    the scripts it is placing will be reachable. A single unreadable entry
+    there is enough to abort the whole install -- a machine that has, say, a
+    package manager leaving a broken shortcut behind produces an error about
+    the thing being installed, which sends you looking in entirely the wrong
+    place.
+
+    Nothing here needs anything from a user's personal tool directories, so
+    PATH is rebuilt from just the interpreter being used plus the operating
+    system's own directories. A broken entry elsewhere then cannot reach us.
+    """
+    env = dict(os.environ)
+    parts = [os.path.dirname(os.path.abspath(python))]
+
+    if os.name == "nt":
+        scripts = os.path.join(os.path.dirname(os.path.abspath(python)), "Scripts")
+        if os.path.isdir(scripts):
+            parts.append(scripts)
+        windir = env.get("SystemRoot") or r"C:\Windows"
+        parts += [os.path.join(windir, "system32"), windir,
+                  os.path.join(windir, "system32", "Wbem"),
+                  os.path.join(windir, "system32", "WindowsPowerShell", "v1.0")]
+    else:
+        parts += ["/usr/local/bin", "/usr/bin", "/bin", "/usr/local/sbin",
+                  "/usr/sbin", "/sbin"]
+
+    env["PATH"] = os.pathsep.join(p for p in parts if os.path.isdir(p))
+    return env
+
+
 def run(cmd, **kwargs):
     print("+ " + " ".join(str(c) for c in cmd), flush=True)
     return subprocess.run(cmd, check=False, **kwargs)
@@ -121,14 +154,16 @@ def main():
     os.makedirs(prefix, exist_ok=True)
 
     if not os.path.exists(venv_python(venv_dir)):
-        if run([sys.executable, "-m", "venv", venv_dir]).returncode != 0:
+        if run([sys.executable, "-m", "venv", venv_dir],
+               env=minimal_env(sys.executable)).returncode != 0:
             raise SystemExit(f"could not create venv at {venv_dir}")
 
     python = venv_python(venv_dir)
-    run([python, "-m", "pip", "install", "--upgrade", "pip", "--quiet"])
+    env = minimal_env(python)
+    run([python, "-m", "pip", "install", "--upgrade", "pip", "--quiet"], env=env)
 
     spec = f"rocm[libraries,device-{args.arch}]=={args.version}"
-    proc = run([python, "-m", "pip", "install", "--index-url", index, spec])
+    proc = run([python, "-m", "pip", "install", "--index-url", index, spec], env=env)
     if proc.returncode != 0:
         raise SystemExit(
             f"\n::error::Could not install '{spec}' from {index}.\n"

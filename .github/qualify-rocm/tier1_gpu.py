@@ -36,6 +36,7 @@ Usage:
 """
 
 import argparse
+import atexit
 import glob
 import json
 import os
@@ -530,7 +531,24 @@ def main():
     if not args.rocm_version:
         parser.error("--rocm-version is required when --meta is not given")
 
-    workdir = tempfile.mkdtemp(prefix="tier1-")
+    # Placed inside the runner's own temporary area when there is one, rather
+    # than the user profile's. An extracted archive plus the test model is a
+    # couple of gigabytes, these machines are reused between jobs, and nothing
+    # clears a user profile's temp folder. cleanup() below removes it either
+    # way; this just means a crash leaves the mess somewhere the runner owns.
+    workdir = tempfile.mkdtemp(prefix="tier1-",
+                               dir=os.environ.get("RUNNER_TEMP") or None)
+
+    # Registered immediately, so the extracted archive and the downloaded model
+    # are removed however this run ends -- including the early exits below and
+    # a failing check, which are the common cases.
+    def cleanup():
+        if os.path.isdir(workdir):
+            print(f"Removing working directory {workdir}")
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    atexit.register(cleanup)
+
     if args.archive_root:
         root = os.path.abspath(args.archive_root)
     elif args.archive:
