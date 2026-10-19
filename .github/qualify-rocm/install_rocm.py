@@ -27,7 +27,7 @@ Everything lands under --prefix and nothing is installed system-wide, so
 repeated runs on a persistent machine stay isolated from each other.
 
 Usage:
-    python3 install_rocm.py --version 10.1.0 --arch gfx1151 --prefix /tmp/rocm
+    python3 install_rocm.py --version 10.1.0 --arch gfx1151
 """
 
 import argparse
@@ -36,6 +36,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 # AMD publishes ROCm wheels on different package indexes depending on the
 # major version. Keep this in step with the index each build job installs from.
@@ -49,12 +50,6 @@ def venv_python(venv_dir):
     if os.name == "nt":
         return os.path.join(venv_dir, "Scripts", "python.exe")
     return os.path.join(venv_dir, "bin", "python")
-
-
-def venv_script(venv_dir, name):
-    if os.name == "nt":
-        return os.path.join(venv_dir, "Scripts", f"{name}.exe")
-    return os.path.join(venv_dir, "bin", name)
 
 
 def run(cmd, **kwargs):
@@ -99,14 +94,21 @@ def main():
         description="Install a user-style ROCm runtime into a throwaway venv")
     parser.add_argument("--version", required=True, help="e.g. 10.1.0")
     parser.add_argument("--arch", required=True, help="e.g. gfx1151")
-    parser.add_argument("--prefix", required=True, help="scratch dir for the venv")
+    parser.add_argument("--prefix", default=None,
+                        help="scratch directory for the virtual environment. "
+                             "Defaults to a 'rocm-qual' folder inside the "
+                             "runner's temporary directory, so callers never "
+                             "have to spell out a shell variable.")
     parser.add_argument("--index-url", default=None,
                         help="override the index chosen from the ROCm major version")
-    parser.add_argument("--output-env", default=None,
-                        help="write KEY=VALUE loader-path lines here (e.g. $GITHUB_ENV)")
     parser.add_argument("--output-json", default=None,
                         help="write the resolved runtime dirs here")
     args = parser.parse_args()
+
+    # Resolved here rather than by the caller so the command line stays free of
+    # shell variables, which are spelled differently in bash and PowerShell.
+    prefix = args.prefix or os.path.join(
+        os.environ.get("RUNNER_TEMP") or tempfile.gettempdir(), "rocm-qual")
 
     major = args.version.split(".")[0]
     index = args.index_url or INDEX_BY_MAJOR.get(major)
@@ -115,8 +117,8 @@ def main():
             f"No package index known for ROCm {args.version} (major {major}). "
             f"Known: {sorted(INDEX_BY_MAJOR)}. Add it to INDEX_BY_MAJOR.")
 
-    venv_dir = os.path.join(args.prefix, f"rocm-{args.version}-{args.arch}")
-    os.makedirs(args.prefix, exist_ok=True)
+    venv_dir = os.path.join(prefix, f"rocm-{args.version}-{args.arch}")
+    os.makedirs(prefix, exist_ok=True)
 
     if not os.path.exists(venv_python(venv_dir)):
         if run([sys.executable, "-m", "venv", venv_dir]).returncode != 0:
@@ -126,27 +128,21 @@ def main():
     run([python, "-m", "pip", "install", "--upgrade", "pip", "--quiet"])
 
     spec = f"rocm[libraries,device-{args.arch}]=={args.version}"
-    proc = run([python, "-m", "pip", "install", "--only-binary", ":all:",
-                "--index-url", index, spec])
+    proc = run([python, "-m", "pip", "install", "--index-url", index, spec])
     if proc.returncode != 0:
         raise SystemExit(
             f"\n::error::Could not install '{spec}' from {index}.\n"
-            f"::error::ROCm {args.version} device wheels for {args.arch} were not "
-            f"resolvable at that index. If this is the 7.x leg, the multi-arch "
-            f"index may not publish per-device wheels -- check what "
-            f"`pip index versions rocm-sdk-device-{args.arch}` offers there, and "
-            f"either point --index-url elsewhere or drop this leg from the matrix.")
+            f"::error::pip's output above says why. Check that {index} still "
+            f"carries both 'rocm' at version {args.version} and a "
+            f"'rocm-sdk-device-{args.arch}' wheel for it -- "
+            f"`pip index versions --index-url {index} rocm-sdk-device-{args.arch}` "
+            f"lists what is actually available there.")
 
     dirs = runtime_dirs(venv_dir)
     if not dirs:
         raise SystemExit(
             "::error::ROCm installed but no _rocm_sdk_*/{bin,lib} directories were "
             f"found under {site_packages(venv_dir)} -- the wheel layout changed.")
-
-    # Informational only -- the search path comes from runtime_dirs() above.
-    sdk = venv_script(venv_dir, "rocm-sdk")
-    if os.path.exists(sdk):
-        run([sdk, "path", "--root"])
 
     print(f"\nROCm {args.version} ({args.arch}) runtime directories:")
     for directory in dirs:
@@ -158,10 +154,14 @@ def main():
                        "index": index, "venv": venv_dir,
                        "runtime_dirs": dirs}, handle, indent=2)
 
-    if args.output_env:
-        joined = os.pathsep.join(dirs)
-        with open(args.output_env, "a", encoding="utf-8") as handle:
-            handle.write(f"ROCM_RUNTIME_DIRS={joined}\n")
+    # Hand the search path to later steps through the workflow environment.
+    # Reading GITHUB_ENV here, instead of taking its path as an argument, keeps
+    # the caller from having to write $GITHUB_ENV (bash) or $env:GITHUB_ENV
+    # (PowerShell) and so lets one command line work under either shell.
+    github_env = os.environ.get("GITHUB_ENV")
+    if github_env:
+        with open(github_env, "a", encoding="utf-8") as handle:
+            handle.write(f"ROCM_RUNTIME_DIRS={os.pathsep.join(dirs)}\n")
             handle.write(f"ROCM_VENV={venv_dir}\n")
     print("\nROCm runtime ready.")
 

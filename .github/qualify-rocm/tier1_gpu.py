@@ -26,8 +26,8 @@ Checks:
                                   correctness signals.
 
 Usage:
-    python3 tier1_gpu.py --archive-root ./extracted --model ./Qwen3-0.6B-Q4_0.gguf \
-        --rocm-version 10.1 --gfx-target gfx1151 --output tier1.json
+    python3 tier1_gpu.py --meta qualify-meta-ubuntu-rocm-10.1.json \
+        --archive-dir ./artifact --output tier1.json
 """
 
 import argparse
@@ -39,6 +39,9 @@ import shutil
 import signal
 import subprocess
 import sys
+import tarfile
+import tempfile
+import zipfile
 import time
 import urllib.error
 import urllib.request
@@ -66,6 +69,67 @@ CPU_FALLBACK_HINTS = [
     re.compile(r"no usable GPU", re.I),
     re.compile(r"offloaded\s+0/\d+\s+layers to GPU"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Inputs this script fetches for itself
+#
+# Extraction and downloading steps live here so the job works on any runner regardless of which shell it has.
+# A self-hosted machine is not guaranteed to provide the same tools a hosted one does.
+# ---------------------------------------------------------------------------
+
+MODEL_URL = ("https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/"
+             "Qwen3-0.6B-Q4_0.gguf")
+
+
+def extract_archive(archive, dest):
+    """Unpack a published archive and return the folder holding the binaries.
+
+    Linux archives nest everything inside a llama-<tag>/ folder; Windows
+    archives put the files at the top level. Rather than encode that
+    difference, find llama-server and use whatever folder it landed in.
+    """
+    os.makedirs(dest, exist_ok=True)
+    if archive.endswith((".tar.gz", ".tgz")):
+        with tarfile.open(archive) as tar:
+            try:
+                tar.extractall(dest, filter="data")
+            except TypeError:  # Python < 3.12
+                tar.extractall(dest)
+    elif archive.endswith(".zip"):
+        with zipfile.ZipFile(archive) as zf:
+            zf.extractall(dest)
+    else:
+        raise SystemExit(f"::error::unsupported archive type: {archive}")
+
+    # Accept either name rather than the one matching the host, so an archive
+    # can also be unpacked and inspected from the other operating system.
+    for dirpath, _dirnames, filenames in os.walk(dest):
+        if {"llama-server", "llama-server.exe"} & set(filenames):
+            return dirpath
+    raise SystemExit(f"::error::llama-server not found anywhere inside {archive}")
+
+
+def download_model(url, path, attempts=3):
+    """Fetch the test model, reusing an existing copy when there is one."""
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        print(f"Model already present: {path} ({os.path.getsize(path):,} bytes)")
+        return path
+    last = None
+    for attempt in range(1, attempts + 1):
+        try:
+            print(f"Downloading model (attempt {attempt}/{attempts}): {url}")
+            with urllib.request.urlopen(url, timeout=600) as resp, \
+                    open(path, "wb") as handle:
+                shutil.copyfileobj(resp, handle)
+            print(f"Downloaded {os.path.getsize(path):,} bytes to {path}")
+            return path
+        except (urllib.error.URLError, OSError) as exc:
+            last = exc
+            if os.path.exists(path):
+                os.remove(path)
+            time.sleep(5 * attempt)
+    raise SystemExit(f"::error::could not download the test model: {last}")
 
 
 # ---------------------------------------------------------------------------
@@ -311,10 +375,21 @@ def check_think_tag(state):
 
 def main():
     parser = argparse.ArgumentParser(description="Tier 1 GPU functional inference")
-    parser.add_argument("--archive-root", required=True,
-                        help="directory holding the extracted llama.cpp binaries")
-    parser.add_argument("--model", required=True, help="path to the .gguf model")
-    parser.add_argument("--rocm-version", required=True)
+    parser.add_argument("--meta", default=None,
+                        help="qualify-meta-*.json written by the build job. Supplies "
+                             "--rocm-version/--tag and names the archive to find "
+                             "under --archive-dir, so the command line needs no "
+                             "other arguments in CI.")
+    parser.add_argument("--archive-dir", default=".",
+                        help="where to look for the archive named by --meta")
+    parser.add_argument("--archive", default=None,
+                        help="published archive to test; extracted automatically")
+    parser.add_argument("--archive-root", default=None,
+                        help="an already-extracted archive, instead of --archive")
+    parser.add_argument("--model", default=None,
+                        help="path to the .gguf model; downloaded if absent")
+    parser.add_argument("--model-url", default=MODEL_URL)
+    parser.add_argument("--rocm-version", default=None)
     parser.add_argument("--gfx-target", default="gfx1151")
     parser.add_argument("--artifact", default=None, help="release asset filename")
     parser.add_argument("--tag", default=None)
@@ -329,7 +404,32 @@ def main():
     parser.add_argument("--fail-on-error", action="store_true")
     args = parser.parse_args()
 
-    root = os.path.abspath(args.archive_root)
+    if args.meta:
+        with open(args.meta, encoding="utf-8-sig") as handle:
+            info = json.load(handle)
+        args.rocm_version = args.rocm_version or info.get("rocm_version")
+        args.tag = args.tag or info.get("tag")
+        args.artifact = args.artifact or info.get("artifact")
+        if not args.archive and not args.archive_root and info.get("artifact"):
+            args.archive = os.path.join(args.archive_dir, info["artifact"])
+
+    if not args.rocm_version:
+        parser.error("--rocm-version is required when --meta is not given")
+
+    workdir = tempfile.mkdtemp(prefix="tier1-")
+    if args.archive_root:
+        root = os.path.abspath(args.archive_root)
+    elif args.archive:
+        if not os.path.exists(args.archive):
+            raise SystemExit(f"::error::archive not found: {args.archive}")
+        root = os.path.abspath(extract_archive(args.archive, os.path.join(workdir, "x")))
+        print(f"Extracted {args.archive} -> {root}")
+    else:
+        parser.error("one of --meta, --archive or --archive-root is required")
+
+    model = args.model or os.path.join(workdir, "Qwen3-0.6B-Q4_0.gguf")
+    download_model(args.model_url, model)
+
     exe = os.path.join(root, "llama-server.exe" if os.name == "nt" else "llama-server")
     if not os.path.exists(exe):
         raise SystemExit(f"::error::llama-server not found at {exe}")
@@ -342,9 +442,9 @@ def main():
     rocm_dirs = [d for d in args.rocm_dirs.split(os.pathsep) if d]
     if not rocm_dirs:
         raise SystemExit(
-            "::error::No ROCm runtime directories supplied. This repo's archives "
-            "do not bundle ROCm -- run install_rocm.py first and pass its "
-            "ROCM_RUNTIME_DIRS through --rocm-dirs.")
+            "::error::No ROCm runtime directories supplied. These archives do "
+            "not bundle ROCm, so install_rocm.py must run first -- it exports "
+            "ROCM_RUNTIME_DIRS, which this script reads automatically.")
 
     staged = stage_hip_runtime(rocm_dirs, root)
     if staged:
@@ -367,7 +467,7 @@ def main():
         args.logs_dir, f"llama-server-{args.gfx_target}-rocm{args.rocm_version}.log")
     base = f"http://127.0.0.1:{args.port}"
     env = build_env(rocm_dirs, root, args.gfx_target)
-    server = Server(exe, os.path.abspath(args.model), args.port, log_path, env, root)
+    server = Server(exe, os.path.abspath(model), args.port, log_path, env, root)
     state = {}
 
     try:

@@ -1187,32 +1187,26 @@ jobs:
           path: ./meta
 
       # Installs the ROCm an end user would install, so T0.12 can confirm the
-      # archive's GPU libraries will actually be found at run time. Allowed to
-      # fail: if the install does not succeed, T0.12 reports itself as skipped
-      # and every other Tier 0 check still runs.
+      # archive's GPU libraries will actually be found at run time. This is NOT
+      # allowed to fail quietly: without it T0.12 has nothing to check against
+      # and reports itself skipped, which would let a genuinely broken archive
+      # through behind a green tick.
       - name: Install a user-style ROCm runtime
-        id: rocm
-        continue-on-error: true
-        shell: bash
-        run: |
-          python .github/qualify-rocm/install_rocm.py \
-            --version "${{ matrix.rocm }}.0" \
-            --arch gfx1151 \
-            --prefix "${RUNNER_TEMP}/rocm-check" \
-            --output-env "$GITHUB_ENV"
+        run: >-
+          python .github/qualify-rocm/install_rocm.py
+          --version ${{ matrix.rocm }}.0
+          --arch gfx1151
 
+      # --fail-on-error makes THIS leg go red as soon as a check fails, which is the only signal a pull request gets.
+      # The release job and the aggregate that normally decides what ships does not run on PR's.
       - name: Run Tier 0 static verification
-        shell: bash
-        run: |
-          mkdir -p fragments
-          # --fail-on-error makes THIS leg go red as soon as a check fails, which is the only signal a pull request gets.
-          # The release job and the aggregate that normally decides what ships does not run on PR's.
-          python .github/qualify-rocm/tier0_static.py \
-            --meta "meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json" \
-            --archive-dir ./artifact \
-            --run-binaries \
-            --fail-on-error \
-            --output "fragments/tier0-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json"
+        run: >-
+          python .github/qualify-rocm/tier0_static.py
+          --meta meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
+          --archive-dir ./artifact
+          --run-binaries
+          --fail-on-error
+          --output fragments/tier0-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
 
       - name: Upload Tier 0 report
         if: always()
@@ -1277,68 +1271,34 @@ jobs:
           name: qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}
           path: ./meta
 
-      - name: Resolve Python
-        shell: bash
-        run: |
-          PY=$(command -v python3 || command -v python) || {
-            echo "::error::No Python interpreter on this runner."; exit 1; }
-          echo "PY=$PY" >> "$GITHUB_ENV"
-          "$PY" --version
-
-      - name: Extract archive
-        shell: bash
-        run: |
-          rm -rf extracted && mkdir -p extracted
-          "$PY" -I -c "
-          import os, sys, tarfile, zipfile
-          src = sys.argv[1]
-          if src.endswith('.zip'):
-              with zipfile.ZipFile(src) as z: z.extractall('extracted')
-          else:
-              with tarfile.open(src) as t:
-                  try: t.extractall('extracted', filter='data')
-                  except TypeError: t.extractall('extracted')
-          " "artifact/llama-bin-${{ matrix.os }}-rocm-${{ matrix.rocm }}-x64.${{ matrix.os == 'win' && 'zip' || 'tar.gz' }}"
-          # Linux tarballs nest under llama-<tag>/; Windows zips are flat.
-          root=$(dirname "$(find extracted -name 'llama-server*' -print -quit)")
-          [ -n "$root" ] || { echo "::error::llama-server not found in archive"; exit 1; }
-          echo "ARCHIVE_ROOT=$root" >> "$GITHUB_ENV"
-          echo "Archive root: $root"
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
 
       # The archives do not contain ROCm -- a user installs it separately. Without
       # this step the Linux binary never starts, and the Windows one is worse: a
       # GPU backend that fails to load is not treated as an error, so llama.cpp
       # quietly runs on the CPU and the test passes while proving nothing.
       - name: Install a user-style ROCm runtime
-        shell: bash
-        run: |
-          "$PY" .github/qualify-rocm/install_rocm.py \
-            --version "${{ matrix.rocm }}.0" \
-            --arch gfx1151 \
-            --prefix "${RUNNER_TEMP}/rocm-qual" \
-            --output-env "$GITHUB_ENV" \
-            --output-json rocm-install.json
+        run: >-
+          python .github/qualify-rocm/install_rocm.py
+          --version ${{ matrix.rocm }}.0
+          --arch gfx1151
+          --output-json rocm-install.json
 
-      - name: Download test model
-        shell: bash
-        run: |
-          url="https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf?download=true"
-          curl -fL --retry 3 --retry-delay 5 -o Qwen3-0.6B-Q4_0.gguf "$url"
-          ls -l Qwen3-0.6B-Q4_0.gguf
-
+      # Unpacking the archive and fetching the test model happen inside the script.
+      # A single-line `python ...` command parses the same way under every shell,
+      # so the job no longer depends on which one a given machine happens to provide.
       - name: Run Tier 1 GPU inference
-        shell: bash
-        run: |
-          mkdir -p fragments
-          "$PY" .github/qualify-rocm/tier1_gpu.py \
-            --archive-root "$ARCHIVE_ROOT" \
-            --model Qwen3-0.6B-Q4_0.gguf \
-            --rocm-version "${{ matrix.rocm }}" \
-            --gfx-target gfx1151 \
-            --artifact "llama-bin-${{ matrix.os }}-rocm-${{ matrix.rocm }}-x64" \
-            --logs-dir fragments \
-            --fail-on-error \
-            --output "fragments/tier1-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json"
+        run: >-
+          python .github/qualify-rocm/tier1_gpu.py
+          --meta meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
+          --archive-dir ./artifact
+          --gfx-target gfx1151
+          --logs-dir fragments
+          --fail-on-error
+          --output fragments/tier1-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
 
       - name: Upload Tier 1 fragments
         if: always()
@@ -1350,14 +1310,22 @@ jobs:
             fragments/*.log
           if-no-files-found: warn
 
+      # A cancelled run can leave llama-server alive and holding GPU memory. The
+      # script cleans up after itself on every normal exit; this is the backstop
+      # for the paths it never gets to. Harmless on a machine that is discarded
+      # after the job, and necessary on one that is not.
       - name: Tear down
         if: always()
-        shell: bash
+        shell: python
         run: |
-          # The stx-halo boxes are persistent; never leave a server holding VRAM.
-          pkill -f llama-server 2>/dev/null || true
-          taskkill //F //IM llama-server.exe 2>/dev/null || true
-          rm -rf extracted artifact Qwen3-0.6B-Q4_0.gguf || true
+          import subprocess, sys
+          cmd = (["taskkill", "/F", "/IM", "llama-server.exe"]
+                 if sys.platform == "win32" else
+                 ["pkill", "-f", "llama-server"])
+          try:
+              subprocess.run(cmd, check=False, capture_output=True, timeout=60)
+          except (OSError, subprocess.SubprocessError) as exc:
+              print(f"cleanup skipped: {exc}")
 
   release:
     # always() overrides the default behavior of skipping this job when a

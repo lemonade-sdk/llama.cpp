@@ -20,6 +20,7 @@ is installed but ROCm itself.
 
 import datetime
 import json
+import os
 import time
 import traceback
 
@@ -169,6 +170,8 @@ class TierReport:
         }
 
     def write(self, path):
+        parent = os.path.dirname(os.path.abspath(path))
+        os.makedirs(parent, exist_ok=True)
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(self.to_dict(), handle, indent=2)
             handle.write("\n")
