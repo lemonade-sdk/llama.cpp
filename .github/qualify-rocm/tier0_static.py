@@ -124,6 +124,11 @@ LEMONADE_SERVER_FLAGS = [
     "--model", "--ctx-size", "--device", "--port", "--jinja", "--metrics",
     "--mmproj", "--no-mmproj-offload", "--model-draft", "--embeddings",
     "--reranking",
+    # Raises log verbosity. Listed because Tier 1 depends on it: without it the
+    # server never prints which device it used, and the GPU check has nothing
+    # to inspect. If upstream renames it, failing here names the cause instead
+    # of leaving Tier 1 to report a confusing absence of evidence.
+    "--verbosity",
 ]
 
 

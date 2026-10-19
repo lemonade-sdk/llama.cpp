@@ -14,16 +14,21 @@ answers are just much slower. T1.2 confirms the GPU really did the work.
 
 Checks:
   T1.1  server boot            -- llama-server starts and serves /health.
-  T1.2  GPU offload confirmed  -- the device/offload lines prove work landed on
-                                  the GPU (gating; the anti-CPU-fallback gate).
-  T1.3  response well-formed   -- non-empty, valid UTF-8, no replacement chars,
-                                  sane length, proper finish_reason.
-  T1.4  greedy determinism     -- two identical temperature=0 requests return
-                                  byte-identical text (gating; model-agnostic
-                                  evidence the sampling loop saw sane logits).
-  T1.5  closed </think> tag    -- NON-gating. A Qwen3-thinking artifact kept as
-                                  a data point; T1.3 and T1.4 are the real
-                                  correctness signals.
+  T1.2  GPU really did the work -- GATING. A ROCm device was selected AND ROCm
+                                  memory was allocated. The familiar
+                                  "offloaded N/N layers to GPU" line is NOT
+                                  accepted as evidence: llama.cpp prints it
+                                  from what -ngl requested, so it appears
+                                  unchanged on a machine with no GPU at all.
+  T1.3  response well-formed   -- GATING. Non-empty, valid UTF-8, no
+                                  replacement characters, sensible length,
+                                  proper finish_reason.
+  T1.4  greedy determinism     -- NON-gating. The same question asked twice
+                                  with randomness off should give the same
+                                  answer. A difference is a hint, not a
+                                  verdict: see check_determinism().
+  T1.5  reasoning pass         -- NON-gating. The model thought, answered, and
+                                  stopped cleanly.
 
 Usage:
     python3 tier1_gpu.py --meta qualify-meta-ubuntu-rocm-10.1.json \
@@ -53,17 +58,32 @@ import report  # noqa: E402
 READY_TIMEOUT = 600
 REQUEST_TIMEOUT = 180
 
-# The flags the downstream consumer launches llama-server with. Using the same
-# ones here means this tier exercises the real integration surface rather than
-# a simplified version of it.
-SERVER_ARGS = ["--ctx-size", "4096", "--jinja", "--metrics"]
+# The flags the downstream consumer launches llama-server with, so this tier
+# exercises the real integration surface rather than a simplified version.
+# `-lv 4` raises the log verbosity, and it is not optional.
+# At the default setting llama-server prints about nine lines -- "model loaded", "listening
+# on ..." -- and none of the device or memory information T1.2 relies on.
+SERVER_ARGS = ["--ctx-size", "4096", "--jinja", "--metrics", "-lv", "4"]
 
-# Device/offload lines that prove llama-server placed work on the GPU.
-GPU_OFFLOAD_PATTERNS = [
-    re.compile(r"using device ROCm"),
-    re.compile(r"offloaded\s+[1-9]\d*/\d+\s+layers to GPU"),
+# Evidence that the GPU genuinely did the work. Both name a ROCm device, so
+# neither can appear unless a ROCm device was found and used:
+#   "llama_prepare_model_devices: using device ROCm0 (...) - 12345 MiB free"
+#   "load_tensors:        ROCm0 model buffer size =  357.09 MiB"
+GPU_PROOF_PATTERNS = [
+    re.compile(r"using device (ROCm\d+)"),
+    re.compile(r"(ROCm\d+)[^\n]*buffer size"),
 ]
 
+# Deliberately NOT treated as proof, despite how it reads.
+# llama.cpp prints "offloaded 29/29 layers to GPU" from the number of layers
+# REQUESTED through -ngl, before any GPU is involved. It appears word for word
+# on a machine with no GPU at all, where every buffer is then reported as CPU.
+# A check that accepted this line would pass on exactly the silent CPU fallback
+# it exists to catch, so it is recorded only for context and nothing more.
+REQUESTED_OFFLOAD_RE = re.compile(r"offloaded\s+(\d+)/(\d+)\s+layers to GPU")
+
+# Lines that explain WHY the GPU went unused, so the failure message can say
+# something more useful than "no evidence found".
 CPU_FALLBACK_HINTS = [
     re.compile(r"failed to load .*ggml-hip", re.I),
     re.compile(r"no usable GPU", re.I),
@@ -258,8 +278,23 @@ class Server:
 # ---------------------------------------------------------------------------
 
 def check_gpu_offload(server, base):
+    """Confirm the GPU actually did the work, not merely that it was asked to.
+
+    This is the check the tier exists for. A GPU backend that fails to load is
+    not an error to llama.cpp: it logs the failure, skips the backend and keeps
+    serving from the CPU. Every other check here passes happily in that state.
+    """
     log = server.log_text()
-    matched = [p.pattern for p in GPU_OFFLOAD_PATTERNS if p.search(log)]
+
+    proof = []
+    for pattern in GPU_PROOF_PATTERNS:
+        for match in pattern.finditer(log):
+            line = match.group(0).strip()
+            if line not in proof:
+                proof.append(line)
+
+    requested = REQUESTED_OFFLOAD_RE.search(log)
+    devices = re.findall(r"^\s*-\s+(\S+)\s*:.*MiB", log, re.MULTILINE)
 
     props_status, props_raw = http_get(f"{base}/props")
     props = {}
@@ -270,60 +305,91 @@ def check_gpu_offload(server, base):
             props = {}
 
     details = {
-        "patterns_matched": matched,
-        "offload_line": next(
-            (m.group(0) for m in
-             [re.search(r"offloaded\s+\d+/\d+\s+layers to GPU", log)] if m), None),
-        "device_line": next(
-            (m.group(0) for m in [re.search(r"using device ROCm\S*.*", log)] if m), None),
-        # /props is supplementary: its schema is not stable across upstream
-        # releases, so it is recorded but never gates.
+        "gpu_proof": proof[:10],
+        # Recorded, never decisive -- see REQUESTED_OFFLOAD_RE above.
+        "requested_offload_line": requested.group(0) if requested else None,
+        "devices_reported": sorted(set(devices)),
+        # /props is supplementary: its shape changes between upstream releases,
+        # so it is recorded but never gates.
         "props_status": props_status,
         "props_n_gpu_layers": (props.get("default_generation_settings") or {})
         .get("n_gpu_layers"),
     }
 
-    if matched:
+    if proof:
+        print("GPU confirmed by:")
+        for line in proof[:10]:
+            print(f"    {line}")
         return (report.STATUS_PASS, None, details)
 
     hints = [p.pattern for p in CPU_FALLBACK_HINTS if p.search(log)]
     details["cpu_fallback_hints"] = hints
-    details["log_tail"] = log[-2000:]
-    reason = ("the GPU backend did not load and llama.cpp fell back to the CPU"
-              if hints else "no device/offload line was logged at all")
+    details["log_tail"] = log[-3000:]
+
+    if hints:
+        reason = "the GPU backend did not load, so llama.cpp used the CPU"
+    elif requested:
+        reason = (f"the only offload line present, '{requested.group(0)}', reports "
+                  "what -ngl asked for rather than what happened; no ROCm device "
+                  "and no ROCm memory allocation were logged")
+    else:
+        reason = "no ROCm device and no ROCm memory allocation were logged"
+
     return (report.STATUS_FAIL,
-            f"GPU offload NOT confirmed -- {reason}. With GGML_BACKEND_DL=ON this "
-            "is silent: the server still answers requests, just on the CPU.",
-            details)
+            f"GPU was NOT used -- {reason}. This is silent at run time: the "
+            "server still starts and still answers, just on the CPU.", details)
+
+
+def _parts(body):
+    """Split a reply into (reasoning, answer, stop reason).
+
+    A model that thinks before answering has that thinking separated out by the
+    server into its own field, so the two arrive apart rather than as one piece
+    of text with markers in it.
+    """
+    choice = (body.get("choices") or [{}])[0]
+    message = choice.get("message") or {}
+    return ((message.get("reasoning_content") or ""),
+            (message.get("content") or ""),
+            choice.get("finish_reason"))
 
 
 def _content(body):
-    choice = (body.get("choices") or [{}])[0]
-    message = choice.get("message") or {}
-    text = (message.get("content") or "") + (message.get("reasoning_content") or "")
-    return text, choice.get("finish_reason")
+    reasoning, answer, finish = _parts(body)
+    return reasoning + answer, finish
 
 
-def chat(base, prompt, max_tokens=192, seed=0):
-    return http_post_json(f"{base}/v1/chat/completions", {
+def chat(base, prompt, max_tokens=192, seed=0, cache_prompt=True):
+    payload = {
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.0,
         "top_k": 1,
         "seed": seed,
-    })
+    }
+    if not cache_prompt:
+        # Stops the second of two identical requests from reusing work cached
+        # by the first, so comparing them is like for like.
+        payload["cache_prompt"] = False
+    return http_post_json(f"{base}/v1/chat/completions", payload)
 
 
 def check_well_formed(base, state):
-    body = chat(base, "In one short paragraph, what is the capital of France?")
-    text, finish = _content(body)
-    state["sample"] = text
+    # A model that thinks before answering spends most of its budget on the
+    # thinking, so this needs enough room to reach an actual answer.
+    body = chat(base, "In one short paragraph, what is the capital of France?",
+                max_tokens=512)
+    reasoning, answer, finish = _parts(body)
+    text = reasoning + answer
+    state.update(reasoning=reasoning, answer=answer, finish=finish)
 
     bad_chars = text.count("�")
     details = {
         "finish_reason": finish,
         "chars": len(text),
-        "sample": text[:200],
+        "reasoning_chars": len(reasoning),
+        "answer_chars": len(answer),
+        "sample": text[:400],
         "replacement_chars": bad_chars,
     }
     problems = []
@@ -343,34 +409,82 @@ def check_well_formed(base, state):
 
 
 def check_determinism(base):
-    prompt = "Count from one to five, separated by commas."
+    """Ask the same question twice with randomness off and compare the answers.
+
+    Non-gating, and worth being honest about why. On a GPU thousands of threads
+    add numbers in whatever order they happen to finish, so results can differ
+    in the last decimal place from one run to the next. That is normal and
+    harmless. It only changes the reply when two candidate words are almost
+    exactly tied -- then the pick flips, and because each word feeds the next,
+    everything after it diverges.
+
+    So a difference here is a hint worth a look, not proof of a defect. The
+    prompt is one the model is confident about and the reply is kept short,
+    because both make a near-tie less likely. Gross corruption, which this
+    would also catch, is already caught by T1.3.
+    """
+    prompt = "What is 2 + 2?"
     outputs = []
     for _ in range(2):
-        body = chat(base, prompt, max_tokens=64)
+        body = chat(base, prompt, max_tokens=64, cache_prompt=False)
         outputs.append(_content(body)[0])
 
-    details = {"first": outputs[0][:200], "second": outputs[1][:200],
-               "identical": outputs[0] == outputs[1]}
+    identical = outputs[0] == outputs[1]
+
+    # Printed in full, both of them, so anyone reading the log can see for
+    # themselves what matched or where the two runs parted company.
+    print(f"Determinism check -- prompt: {prompt!r}")
+    print(f"  run 1 ({len(outputs[0])} chars): {outputs[0]!r}")
+    print(f"  run 2 ({len(outputs[1])} chars): {outputs[1]!r}")
+    print(f"  verdict: {'IDENTICAL' if identical else 'DIFFERENT'}")
+
+    # Stored in full as well -- a truncated record cannot show where they differ.
+    details = {"prompt": prompt, "identical": identical,
+               "first": outputs[0], "second": outputs[1]}
+
     if not outputs[0].strip():
-        return (report.STATUS_FAIL, "greedy request returned nothing", details)
-    if outputs[0] != outputs[1]:
-        return (report.STATUS_FAIL,
-                "two identical temperature=0 requests produced different text -- "
-                "the sampling path is non-deterministic, which usually means "
-                "uninitialised memory or NaN logits in the GPU kernels", details)
+        return (report.STATUS_WARN, "the greedy request returned nothing", details)
+    if not identical:
+        prefix = os.path.commonprefix(outputs)
+        details["diverged_at_char"] = len(prefix)
+        return (report.STATUS_WARN,
+                f"the same question asked twice gave different answers, diverging "
+                f"after {len(prefix)} characters. Usually harmless -- two words "
+                "were near-tied and rounding decided between them -- but worth "
+                "investigating if it happens on every run.", details)
     return (report.STATUS_PASS, None, details)
 
 
-def check_think_tag(state):
-    text = state.get("sample") or ""
-    closed = "</think>" in text
-    details = {"found": closed, "sample": text[:200]}
-    if closed:
+def check_reasoning_pass(state):
+    """Did the model think first, then answer, and stop cleanly?
+
+    This originally looked for a literal closing </think> marker, which cannot
+    work: the server parses the thinking out into its own field, so the markers
+    never reach us. The intent is kept -- confirm a complete reasoning pass ran
+    end to end -- without depending on text that gets stripped on the way.
+
+    Non-gating. It describes how one model behaves rather than whether the
+    build is correct; T1.2 through T1.4 are the signals that matter.
+    """
+    reasoning = state.get("reasoning") or ""
+    answer = state.get("answer") or ""
+    finish = state.get("finish")
+    details = {"reasoning_chars": len(reasoning), "answer_chars": len(answer),
+               "finish_reason": finish,
+               "reasoning_sample": reasoning[:200],
+               "answer_sample": answer[:200]}
+
+    if finish == "length":
+        return (report.STATUS_WARN,
+                "the reply ran out of tokens before the model finished, so a "
+                "complete reasoning pass could not be observed", details)
+    if reasoning.strip() and answer.strip():
         return (report.STATUS_PASS, None, details)
-    return (report.STATUS_WARN,
-            "no closed </think> tag. This is a Qwen3-thinking chat-template "
-            "artifact, not a correctness signal -- T1.3/T1.4 are authoritative.",
-            details)
+    if answer.strip():
+        return (report.STATUS_WARN,
+                "the model answered without a separate reasoning pass, which is "
+                "normal for a model that does not think out loud", details)
+    return (report.STATUS_WARN, "no answer was produced", details)
 
 
 def main():
@@ -481,19 +595,20 @@ def main():
                      details={"log_tail": server.log_text()[-3000:]})
 
         if ready:
-            tier.run("T1.2", "GPU offload confirmed",
+            tier.run("T1.2", "GPU really did the work",
                      lambda: check_gpu_offload(server, base))
             tier.run("T1.3", "response well-formed",
                      lambda: check_well_formed(base, state))
-            tier.run("T1.4", "greedy determinism", lambda: check_determinism(base))
-            tier.run("T1.5", "closed </think> tag",
-                     lambda: check_think_tag(state), gating=False)
+            tier.run("T1.4", "greedy determinism",
+                     lambda: check_determinism(base), gating=False)
+            tier.run("T1.5", "reasoning pass completed",
+                     lambda: check_reasoning_pass(state), gating=False)
         else:
             for test_id, name, gating in [
-                ("T1.2", "GPU offload confirmed", True),
+                ("T1.2", "GPU really did the work", True),
                 ("T1.3", "response well-formed", True),
-                ("T1.4", "greedy determinism", True),
-                ("T1.5", "closed </think> tag", False),
+                ("T1.4", "greedy determinism", False),
+                ("T1.5", "reasoning pass completed", False),
             ]:
                 tier.add(test_id, name, report.STATUS_SKIP,
                          gating=gating, error="server not ready")
