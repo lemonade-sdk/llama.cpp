@@ -1242,13 +1242,13 @@ jobs:
         include:
           - os: ubuntu
             rocm: "7.14"
-            runner: [stx-halo, Linux]
+            runner: [xsj-dispatch, strix-halo, Linux]
           - os: ubuntu
             rocm: "10.0"
-            runner: [stx-halo, Linux]
+            runner: [xsj-dispatch, strix-halo, Linux]
           - os: ubuntu
             rocm: "10.1"
-            runner: [stx-halo, Linux]
+            runner: [xsj-dispatch, strix-halo, Linux]
           - os: win
             rocm: "7.14"
             runner: [xsj-dispatch, strix-halo, Windows]
