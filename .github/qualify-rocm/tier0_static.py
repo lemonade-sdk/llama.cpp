@@ -26,8 +26,10 @@ Checks:
                                       distribution we support.
   T0.7  library search path        -- Linux only. No absolute build-machine
                                       paths baked into the binaries.
-  T0.8  llama-server flag surface  -- the flags Lemonade launches with still
-                                      parse (needs --run-binaries).
+  T0.8  llama-server flag surface  -- the flags the downstream consumer
+                                      launches with, and the one Tier 1 relies
+                                      on, are all still accepted (needs
+                                      --run-binaries).
   T0.9  archive tag consistency    -- the directory inside the tarball matches
                                       the tag in the asset filename.
   T0.12 ROCm dependency resolution -- the ROCm libraries this archive needs

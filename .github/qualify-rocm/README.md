@@ -26,13 +26,23 @@ archive. That is what this suite is for.
 
 | Tier | Runs on | Blocks a release? |
 |---|---|---|
-| Tier 0 — static checks | standard GitHub runners, including on PRs | yes, affected ROCm version only |
-| Tier 1 — GPU inference | self-hosted machines with a real AMD GPU | yes, affected ROCm version only |
+| Tier 0 — static checks | standard GitHub runners | yes, affected ROCm version only |
+| Tier 1 — GPU inference | self-hosted machines with an AMD GPU | yes, affected ROCm version only |
+
+Both tiers run on every trigger, pull requests included. The one exception is
+that Tier 1 is skipped for a pull request opened from a fork.
+
+Each tier runs one job per published archive — two operating systems by three
+ROCm versions — so a failure is reported against the exact archive it affects.
 
 Each ROCm version is treated as an independent product. A consumer downloads
 exactly one of them, so a failure in one version removes only that version's
 Windows and Linux pair; the other versions, and every non-ROCm backend, publish
 as normal. The release job then exits non-zero so the gap is noticed.
+
+On a pull request nothing is published at all, so there is no aggregate step to
+pass judgement. Each job therefore fails on its own as soon as a check fails —
+otherwise a pull request would report success no matter what the checks found.
 
 ### Tier 0 — `tier0_static.py`, `check_post_merge.py`
 
@@ -69,16 +79,17 @@ small model, and talks to it over HTTP.
 | T1.1 | the server starts and reports itself healthy | yes |
 | T1.2 | the GPU actually did the work | yes |
 | T1.3 | the reply is non-empty, valid text of a sensible length, with a proper stop reason | yes |
-| T1.4 | two identical requests with randomness disabled give identical replies | yes |
-| T1.5 | the model closed its reasoning block | no |
+| T1.4 | the same question asked twice with randomness off gives the same answer | no |
+| T1.5 | the model reasoned, answered, and stopped cleanly | no |
 
 **T1.2 is the one that matters.** Every other check in this tier passes
-perfectly well when the GPU was never used at all.
+perfectly well when the GPU was never used at all — the answers are simply
+slower. How it avoids being fooled is described below.
 
-T1.4 is worth a word too: with randomness switched off, the same question must
-produce the same answer every time. When it does not, something underneath is
-reading uninitialised memory or producing invalid numbers — a problem that
-otherwise shows up as occasional nonsense rather than a clean failure.
+T1.4 and T1.5 are recorded but never block a release. Both describe how one
+model behaves on one day rather than whether the build is correct, and both
+can differ for reasons that are not defects. They are kept because they are
+cheap and occasionally informative, not because they prove anything.
 
 ## How some of this works
 
@@ -104,6 +115,36 @@ Two deliberate behaviours:
   present. The compiler writes one entry per source file, so in a healthy build
   every target has the same count; a target with a lower count was built into
   only part of the project, which a present/absent check would miss.
+
+### Proving the GPU was used
+
+Two things make this harder than it looks, and both have to be handled or T1.2
+reports the wrong answer.
+
+**The server says almost nothing by default.** Left alone, `llama-server`
+prints about nine lines — it loaded a model, it is listening — and none of the
+device or memory detail the check needs. That is why Tier 1 launches it with
+`-lv 4`. Without that flag the check finds no evidence and fails a perfectly
+good build.
+
+**The obvious evidence is not evidence.** llama.cpp prints a line like:
+
+```
+load_tensors: offloaded 29/29 layers to GPU
+```
+
+This comes from what `-ngl` *asked for*, and the line appears word for word on a machine with no GPU at all — where the very next lines then report every buffer as `CPU`. A check that accepted it would pass on exactly the silent fallback it exists to catch.
+
+So T1.2 requires evidence that names a ROCm device, which cannot appear unless
+one was found and used:
+
+```
+llama_prepare_model_devices: using device ROCm0 (...) - 12345 MiB free
+load_tensors:        ROCm0 model buffer size =   357.09 MiB
+```
+
+The `offloaded N/N` line is still recorded, as context for whoever reads the
+report, but it never decides the outcome.
 
 ### Which ROCm the checks verify against
 
@@ -133,8 +174,11 @@ deliberately.
 
 ## Running by hand
 
+Everything here works against a downloaded release asset on a normal machine,
+which is the quickest way to check a CI result yourself.
+
 ```bash
-# Check a downloaded release asset
+# Static checks on a downloaded release asset
 python3 .github/qualify-rocm/tier0_static.py \
     --archive llama-bNNNNN-bin-ubuntu-rocm-10.1-x64.tar.gz \
     --os ubuntu --rocm-version 10.1 \
@@ -147,6 +191,26 @@ python3 .github/qualify-rocm/aggregate.py \
     --records-dir ./qualification --fail-on-no-promote
 ```
 
+To run the GPU checks on a machine with a supported AMD GPU, install a
+user-style ROCm first — it goes into a throwaway folder and changes nothing
+system-wide — then point the inference check at the archive. The model is
+downloaded automatically if it is not already there.
+
+```bash
+python3 .github/qualify-rocm/install_rocm.py --version 10.1.0 --arch gfx1151
+# install_rocm.py prints the runtime directories; pass them through --rocm-dirs,
+# or let the workflow's exported ROCM_RUNTIME_DIRS be picked up automatically.
+
+python3 .github/qualify-rocm/tier1_gpu.py \
+    --archive llama-bNNNNN-bin-win-rocm-10.1-x64.zip \
+    --rocm-version 10.1 --rocm-dirs "<dirs printed above>" \
+    --output tier1.json
+```
+
+Running that twice — once with those directories and once pointing at an empty
+one — is a useful sanity check on T1.2 itself: it should pass the first time
+and fail the second.
+
 Each run writes a `qualification-<archive>.json` record that is attached to the
 release. It lists which gfx targets the archive contains code for, which of them
 were actually tested on hardware, and the result of every check — so questions
@@ -157,6 +221,11 @@ the CI logs have expired.
 
 - **Performance.** Tracked downstream against these same artifacts; a second
   set of numbers here would split the history.
-- **Answer quality.** T1.3 and T1.4 cover "the output is well-formed and
-  reproducible", which is what catches broken GPU kernels. Judging whether an
-  answer is *good* is a separate problem.
+- **Answer quality.** T1.3 covers "the output is well-formed", which is what
+  catches a backend producing nonsense. Judging whether an answer is *good* is
+  a separate problem needing a different kind of test.
+- **Bit-for-bit reproducibility.** T1.4 looks at this but does not enforce it.
+  A GPU adds numbers in whatever order its threads finish, so results can
+  differ in the last decimal place between runs. That only changes the reply
+  when two candidate words are nearly tied, and when it does it is usually
+  harmless. Treating it as a release gate would block good builds.

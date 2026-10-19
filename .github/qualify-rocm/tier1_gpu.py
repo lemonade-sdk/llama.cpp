@@ -458,13 +458,13 @@ def check_determinism(base):
 def check_reasoning_pass(state):
     """Did the model think first, then answer, and stop cleanly?
 
-    This originally looked for a literal closing </think> marker, which cannot
-    work: the server parses the thinking out into its own field, so the markers
-    never reach us. The intent is kept -- confirm a complete reasoning pass ran
-    end to end -- without depending on text that gets stripped on the way.
+    Looks at the structure of the reply rather than searching it for the
+    markers a thinking model writes around its reasoning. Those markers never
+    reach us: the server strips them and returns the reasoning in its own
+    field, so a check that searched the text for them could never pass.
 
     Non-gating. It describes how one model behaves rather than whether the
-    build is correct; T1.2 through T1.4 are the signals that matter.
+    build is correct; T1.2 and T1.3 are the signals that matter.
     """
     reasoning = state.get("reasoning") or ""
     answer = state.get("answer") or ""
