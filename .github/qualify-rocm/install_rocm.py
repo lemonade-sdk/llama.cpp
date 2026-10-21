@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""
+Install a ROCm runtime into a throwaway virtual environment, matching the way
+an end user's machine gets one.
+
+The archives this repo publishes do not contain ROCm -- a user installs it
+separately and llama.cpp loads it at run time. So a qualification job that only
+unpacks the archive and runs it is testing nothing: on Linux llama-server never
+starts, and on Windows it is worse, because a GPU backend that fails to load is
+not treated as an error. llama.cpp logs it, skips the backend, and quietly runs
+on the CPU, so the test passes while the thing it was meant to verify is
+completely broken.
+
+What gets installed:
+
+  pip install --index-url <index> "rocm[libraries,device-<arch>]==<version>"
+
+The part in brackets matters. A BUILD needs ROCm's compilers, so the build jobs
+ask for the "devel" component. A USER needs the kernels for their own GPU, so
+they get "device-<arch>" instead. Verifying against the build's own components
+would be circular -- those are the exact files the binary was compiled against,
+so of course they are present. Installing the user's set instead means the
+checks answer the question that actually matters: will this archive find what
+it needs on a real machine?
+
+Everything lands under --prefix and nothing is installed system-wide, so
+repeated runs on a persistent machine stay isolated from each other.
+
+Usage:
+    python3 install_rocm.py --version 10.1.0 --arch gfx1151
+"""
+
+import argparse
+import glob
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+# AMD publishes ROCm wheels on different package indexes depending on the
+# major version. Keep this in step with the index each build job installs from.
+INDEX_BY_MAJOR = {
+    "7": "https://repo.amd.com/rocm/whl-multi-arch/",
+    "10": "https://stable.repo.amd.com/rocm/whl-next/",
+}
+
+
+def venv_python(venv_dir):
+    if os.name == "nt":
+        return os.path.join(venv_dir, "Scripts", "python.exe")
+    return os.path.join(venv_dir, "bin", "python")
+
+
+def minimal_env(python):
+    """A copy of the environment with PATH cut down to what pip needs.
+
+    pip reads every directory on PATH while it installs, to work out whether
+    the scripts it is placing will be reachable. A single unreadable entry
+    there is enough to abort the whole install -- a machine that has, say, a
+    package manager leaving a broken shortcut behind produces an error about
+    the thing being installed, which sends you looking in entirely the wrong
+    place.
+
+    Nothing here needs anything from a user's personal tool directories, so
+    PATH is rebuilt from just the interpreter being used plus the operating
+    system's own directories. A broken entry elsewhere then cannot reach us.
+    """
+    env = dict(os.environ)
+    parts = [os.path.dirname(os.path.abspath(python))]
+
+    if os.name == "nt":
+        scripts = os.path.join(os.path.dirname(os.path.abspath(python)), "Scripts")
+        if os.path.isdir(scripts):
+            parts.append(scripts)
+        windir = env.get("SystemRoot") or r"C:\Windows"
+        parts += [os.path.join(windir, "system32"), windir,
+                  os.path.join(windir, "system32", "Wbem"),
+                  os.path.join(windir, "system32", "WindowsPowerShell", "v1.0")]
+    else:
+        parts += ["/usr/local/bin", "/usr/bin", "/bin", "/usr/local/sbin",
+                  "/usr/sbin", "/sbin"]
+
+    env["PATH"] = os.pathsep.join(p for p in parts if os.path.isdir(p))
+    return env
+
+
+def run(cmd, **kwargs):
+    print("+ " + " ".join(str(c) for c in cmd), flush=True)
+    return subprocess.run(cmd, check=False, **kwargs)
+
+
+def site_packages(venv_dir):
+    if os.name == "nt":
+        matches = [os.path.join(venv_dir, "Lib", "site-packages")]
+    else:
+        matches = sorted(glob.glob(os.path.join(venv_dir, "lib", "python3*", "site-packages")))
+    for path in matches:
+        if os.path.isdir(path):
+            return path
+    raise SystemExit(f"no site-packages under {venv_dir}")
+
+
+def runtime_dirs(venv_dir):
+    """Every directory that has to be on the library search path.
+
+    This returns a list, not a single root directory, because ROCm spreads its
+    runtime across several packages: the core HIP libraries live in one, and
+    the maths libraries (rocBLAS, hipBLAS and friends) live in another. Adding
+    only the first means the core loads and then the maths libraries cannot be
+    found, which surfaces as a confusing "DLL not found" on Windows or a
+    missing-library error on Linux.
+    """
+    site = site_packages(venv_dir)
+    dirs = []
+    for pkg in sorted(glob.glob(os.path.join(site, "_rocm_sdk_*"))):
+        for sub in ("bin", "lib", os.path.join("lib", "llvm", "bin"),
+                    os.path.join("lib", "llvm", "lib")):
+            candidate = os.path.join(pkg, sub)
+            if os.path.isdir(candidate) and candidate not in dirs:
+                dirs.append(candidate)
+    return dirs
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Install a user-style ROCm runtime into a throwaway venv")
+    parser.add_argument("--version", required=True, help="e.g. 10.1.0")
+    parser.add_argument("--arch", required=True, help="e.g. gfx1151")
+    parser.add_argument("--prefix", default=None,
+                        help="scratch directory for the virtual environment. "
+                             "Defaults to a 'rocm-qual' folder inside the "
+                             "runner's temporary directory, so callers never "
+                             "have to spell out a shell variable.")
+    parser.add_argument("--index-url", default=None,
+                        help="override the index chosen from the ROCm major version")
+    parser.add_argument("--output-json", default=None,
+                        help="write the resolved runtime dirs here")
+    args = parser.parse_args()
+
+    # Resolved here rather than by the caller so the command line stays free of
+    # shell variables, which are spelled differently in bash and PowerShell.
+    prefix = args.prefix or os.path.join(
+        os.environ.get("RUNNER_TEMP") or tempfile.gettempdir(), "rocm-qual")
+
+    major = args.version.split(".")[0]
+    index = args.index_url or INDEX_BY_MAJOR.get(major)
+    if not index:
+        raise SystemExit(
+            f"No package index known for ROCm {args.version} (major {major}). "
+            f"Known: {sorted(INDEX_BY_MAJOR)}. Add it to INDEX_BY_MAJOR.")
+
+    venv_dir = os.path.join(prefix, f"rocm-{args.version}-{args.arch}")
+    os.makedirs(prefix, exist_ok=True)
+
+    if not os.path.exists(venv_python(venv_dir)):
+        if run([sys.executable, "-m", "venv", venv_dir],
+               env=minimal_env(sys.executable)).returncode != 0:
+            raise SystemExit(f"could not create venv at {venv_dir}")
+
+    python = venv_python(venv_dir)
+    env = minimal_env(python)
+    run([python, "-m", "pip", "install", "--upgrade", "pip", "--quiet"], env=env)
+
+    spec = f"rocm[libraries,device-{args.arch}]=={args.version}"
+    proc = run([python, "-m", "pip", "install", "--index-url", index, spec], env=env)
+    if proc.returncode != 0:
+        raise SystemExit(
+            f"\n::error::Could not install '{spec}' from {index}.\n"
+            f"::error::pip's output above says why. Check that {index} still "
+            f"carries both 'rocm' at version {args.version} and a "
+            f"'rocm-sdk-device-{args.arch}' wheel for it -- "
+            f"`pip index versions --index-url {index} rocm-sdk-device-{args.arch}` "
+            f"lists what is actually available there.")
+
+    dirs = runtime_dirs(venv_dir)
+    if not dirs:
+        raise SystemExit(
+            "::error::ROCm installed but no _rocm_sdk_*/{bin,lib} directories were "
+            f"found under {site_packages(venv_dir)} -- the wheel layout changed.")
+
+    print(f"\nROCm {args.version} ({args.arch}) runtime directories:")
+    for directory in dirs:
+        print(f"  {directory}")
+
+    if args.output_json:
+        with open(args.output_json, "w", encoding="utf-8") as handle:
+            json.dump({"version": args.version, "arch": args.arch,
+                       "index": index, "venv": venv_dir,
+                       "runtime_dirs": dirs}, handle, indent=2)
+
+    # Hand the search path to later steps through the workflow environment.
+    # Reading GITHUB_ENV here, instead of taking its path as an argument, keeps
+    # the caller from having to write $GITHUB_ENV (bash) or $env:GITHUB_ENV
+    # (PowerShell) and so lets one command line work under either shell.
+    github_env = os.environ.get("GITHUB_ENV")
+    if github_env:
+        with open(github_env, "a", encoding="utf-8") as handle:
+            handle.write(f"ROCM_RUNTIME_DIRS={os.pathsep.join(dirs)}\n")
+            handle.write(f"ROCM_VENV={venv_dir}\n")
+    print("\nROCm runtime ready.")
+
+
+if __name__ == "__main__":
+    main()

@@ -15,6 +15,9 @@ on:
       # action is consumed via a pinned @lemonade ref, so only changes to this
       # workflow itself can affect the outcome of a PR run. Scope PR runs to it.
       - '.github/workflows/release.yml'
+      # The qualification suite decides whether the ROCm family ships, so a
+      # change to it must be validated the same way.
+      - '.github/qualify-rocm/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}
@@ -25,7 +28,34 @@ env:
   CMAKE_ARGS: "-DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON"
 
 jobs:
+  # Every build job below clones llama.cpp from upstream. Left to themselves
+  # they each clone at their own start time, so a push upstream mid-run means
+  # different jobs compile DIFFERENT source and the release then labels them
+  # all with one tag. Resolve the commit once here and have every job check out
+  # that exact commit, so one release is one upstream revision.
+  resolve-upstream:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          repository: 'ggml-org/llama.cpp'
+
+      - name: Resolve commit and tag
+        id: resolve
+        run: |
+          sha=$(git rev-parse HEAD)
+          tag="b$(git rev-list --count HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Pinning this run to upstream $sha ($tag)"
+
   ubuntu-24-rocm:
+    needs: resolve-upstream
     runs-on: ubuntu-24.04
 
     strategy:
@@ -51,6 +81,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -75,7 +106,7 @@ jobs:
       - name: Dependencies
         id: depends
         run: |
-          sudo apt install -y build-essential git cmake wget
+          sudo apt install -y build-essential git cmake wget patchelf
 
       - name: Setup TheRock with Wheels
         id: therock_env
@@ -127,9 +158,22 @@ jobs:
             ${{ env.CMAKE_ARGS }}
           cmake --build build --config Release -j $(nproc)
 
+      # The HIP link adds the pip-installed ROCm devel tree's lib dir to RUNPATH,
+      # so without this the shipped libggml-hip.so carries an absolute build-machine path
+      # (.../_rocm_sdk_devel/lib) that means nothing on a user's box.
+      - name: Normalize RPATH for portable distribution
+        run: |
+          for f in build/bin/*; do
+            [ -f "$f" ] && ! [ -L "$f" ] || continue
+            if file "$f" | grep -q 'ELF'; then
+              patchelf --set-rpath '$ORIGIN' "$f"
+            fi
+          done
+
       - name: Determine tag name
         id: tag
-        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+        shell: bash
+        run: echo "name=${{ needs.resolve-upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Get ROCm short version
         run: echo "ROCM_VERSION_SHORT=$(echo '${{ matrix.ROCM_VERSION }}' | cut -d '.' -f 1,2)" >> $GITHUB_ENV
@@ -140,13 +184,38 @@ jobs:
           cp LICENSE ./build/bin/
           tar -czvf llama-bin-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.tar.gz --transform "s,./,llama-${{ steps.tag.outputs.name }}/," -C ./build/bin .
 
+      # The qualification jobs must audit the fat binary against the SAME target
+      # list this job compiled, so publish the matrix entry alongside the
+      # artifact instead of duplicating it in another job.
+      - name: Record qualification metadata
+        run: |
+          cat > qualify-meta-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}.json <<EOF
+          {
+            "os": "ubuntu",
+            "rocm_version": "${{ env.ROCM_VERSION_SHORT }}",
+            "rocm_version_full": "${{ matrix.ROCM_VERSION }}",
+            "gpu_targets": "${{ matrix.gpu_targets }}",
+            "tag": "${{ steps.tag.outputs.name }}",
+            "upstream_sha": "${{ needs.resolve-upstream.outputs.sha }}",
+            "artifact": "llama-bin-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.tar.gz"
+          }
+          EOF
+          cat qualify-meta-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}.json
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           path: llama-bin-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.tar.gz
           name: llama-bin-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.tar.gz
 
+      - name: Upload qualification metadata
+        uses: actions/upload-artifact@v6
+        with:
+          path: qualify-meta-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}.json
+          name: qualify-meta-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}
+
   ubuntu-22-cuda:
+    needs: resolve-upstream
     runs-on: ubuntu-22.04
 
     strategy:
@@ -163,6 +232,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -318,7 +388,8 @@ jobs:
 
       - name: Determine tag name
         id: tag
-        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+        shell: bash
+        run: echo "name=${{ needs.resolve-upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Pack artifacts
         id: pack_artifacts
@@ -341,6 +412,7 @@ jobs:
           name: llama-ubuntu-cuda-${{ matrix.sm }}-x64.tar.xz
 
   ubuntu-22-cuda-arm64:
+    needs: resolve-upstream
     runs-on: ubuntu-22.04-arm
 
     strategy:
@@ -357,6 +429,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -500,7 +573,8 @@ jobs:
 
       - name: Determine tag name
         id: tag
-        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+        shell: bash
+        run: echo "name=${{ needs.resolve-upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Pack artifacts
         id: pack_artifacts
@@ -523,6 +597,7 @@ jobs:
           name: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
 
   ubuntu-22-openvino:
+    needs: resolve-upstream
     runs-on: ubuntu-22.04
 
     env:
@@ -536,6 +611,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -647,7 +723,8 @@ jobs:
 
       - name: Determine tag name
         id: tag
-        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+        shell: bash
+        run: echo "name=${{ needs.resolve-upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Pack artifacts
         run: |
@@ -663,6 +740,7 @@ jobs:
           name: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
 
   windows-cpu:
+    needs: resolve-upstream
     runs-on: windows-2025
 
     strategy:
@@ -677,6 +755,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
@@ -734,6 +813,7 @@ jobs:
           name: llama-bin-win-cpu-${{ matrix.arch }}.zip
 
   windows-rocm:
+    needs: resolve-upstream
     runs-on: windows-2022
 
     strategy:
@@ -759,6 +839,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: Cache ROCm Installation
         id: cache-rocm
@@ -867,7 +948,8 @@ jobs:
 
       - name: Determine tag name
         id: tag
-        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+        shell: bash
+        run: echo "name=${{ needs.resolve-upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Get ROCm short version
         run: |
@@ -879,15 +961,37 @@ jobs:
           cp "LICENSE" "build\bin\"
           7z a -snl llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip .\build\bin\*
 
+      - name: Record qualification metadata
+        run: |
+          $meta = [ordered]@{
+            os               = 'win'
+            rocm_version     = '${{ env.ROCM_VERSION_SHORT }}'
+            rocm_version_full= '${{ matrix.ROCM_VERSION }}'
+            gpu_targets      = '${{ matrix.gpu_targets }}'
+            tag              = '${{ steps.tag.outputs.name }}'
+            upstream_sha     = '${{ needs.resolve-upstream.outputs.sha }}'
+            artifact         = 'llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip'
+          }
+          $path = "qualify-meta-win-rocm-${{ env.ROCM_VERSION_SHORT }}.json"
+          $meta | ConvertTo-Json | Set-Content -Path $path -Encoding utf8
+          Get-Content $path
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           path: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip
           name: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip
 
+      - name: Upload qualification metadata
+        uses: actions/upload-artifact@v6
+        with:
+          path: qualify-meta-win-rocm-${{ env.ROCM_VERSION_SHORT }}.json
+          name: qualify-meta-win-rocm-${{ env.ROCM_VERSION_SHORT }}
+
   windows-cuda:
     runs-on: windows-2022
     needs:
+      - resolve-upstream
       - windows-cpu
 
     strategy:
@@ -904,6 +1008,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -1025,6 +1130,224 @@ jobs:
           path: llama-windows-cuda-${{ matrix.sm }}-x64.7z
           name: llama-windows-cuda-${{ matrix.sm }}-x64.7z
 
+  # ---------------------------------------------------------------------------
+  # ROCm build qualification. See .github/qualify-rocm/README.md.
+  #
+  # Tier 0 is static and runs on free hosted runners, including on PRs.
+  # Tier 1 runs real inference on the gfx1151 self-hosted boxes.
+  # Neither can block the CUDA/OpenVINO/CPU families: the release job drops
+  # only the ROCm family when qualification fails (see "Qualify ROCm release
+  # artifacts" there).
+  # ---------------------------------------------------------------------------
+
+  qualify-tier0:
+    # !cancelled() rather than always(): if a ROCm build leg failed there is no
+    # archive to audit, and the release job's existing per-family completeness
+    # check is what reports that gap. This job vouches for whatever was built.
+    if: ${{ !cancelled() }}
+    needs:
+      - ubuntu-24-rocm
+      - windows-rocm
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # One leg per published archive. Each leg must run on the archive's own
+        # OS, because two of the checks launch llama-server out of the archive
+        # and install the ROCm a user of that archive would install.
+        os: [ubuntu, win]
+        rocm: ["7.14", "10.0", "10.1"]
+        include:
+          - os: ubuntu
+            runner: ubuntu-24.04
+          - os: win
+            runner: windows-2025
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout qualification suite
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Download ROCm archive
+        uses: actions/download-artifact@v7
+        with:
+          name: llama-bin-${{ matrix.os }}-rocm-${{ matrix.rocm }}-x64.${{ matrix.os == 'win' && 'zip' || 'tar.gz' }}
+          path: ./artifact
+
+      - name: Download qualification metadata
+        uses: actions/download-artifact@v7
+        with:
+          name: qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}
+          path: ./meta
+
+      # Installs the ROCm an end user would install, so T0.12 can confirm the
+      # archive's GPU libraries will actually be found at run time. This is NOT
+      # allowed to fail quietly: without it T0.12 has nothing to check against
+      # and reports itself skipped, which would let a genuinely broken archive
+      # through behind a green tick.
+      - name: Install a user-style ROCm runtime
+        run: >-
+          python .github/qualify-rocm/install_rocm.py
+          --version ${{ matrix.rocm }}.0
+          --arch gfx1151
+
+      # --fail-on-error makes THIS leg go red as soon as a check fails, which is the only signal a pull request gets.
+      # The release job and the aggregate that normally decides what ships does not run on PR's.
+      - name: Run Tier 0 static verification
+        run: >-
+          python .github/qualify-rocm/tier0_static.py
+          --meta meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
+          --archive-dir ./artifact
+          --run-binaries
+          --fail-on-error
+          --output fragments/tier0-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
+
+      - name: Upload Tier 0 report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualify-fragments-tier0-${{ matrix.os }}-${{ matrix.rocm }}
+          path: fragments/*.json
+          if-no-files-found: warn
+
+  qualify-tier1:
+    # Hardware validation on the Strix Halo (gfx1151) runners.
+    # Only one of the 20+ gfx targets in a build has test hardware.
+    # The qualification record states that explicitly rather than implying the rest were tested too.
+    # Runs on every trigger -- schedule, manual dispatch and pull request -- EXCEPT a pull request opened from a fork.
+    if: >-
+      ${{ !cancelled() &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository) }}
+    needs:
+      - ubuntu-24-rocm
+      - windows-rocm
+
+    strategy:
+      fail-fast: false
+      # Six legs: three ROCm versions (7.14, 10.0, 10.1) on each of Windows and Linux.
+      matrix:
+        include:
+          - os: ubuntu
+            rocm: "7.14"
+            runner: [xsj-dispatch, strix-halo, Linux]
+          - os: ubuntu
+            rocm: "10.0"
+            runner: [xsj-dispatch, strix-halo, Linux]
+          - os: ubuntu
+            rocm: "10.1"
+            runner: [xsj-dispatch, strix-halo, Linux]
+          - os: win
+            rocm: "7.14"
+            runner: [xsj-dispatch, strix-halo, Windows]
+          - os: win
+            rocm: "10.0"
+            runner: [xsj-dispatch, strix-halo, Windows]
+          - os: win
+            rocm: "10.1"
+            runner: [xsj-dispatch, strix-halo, Windows]
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout qualification suite
+        uses: actions/checkout@v6
+
+      - name: Download ROCm archive
+        uses: actions/download-artifact@v7
+        with:
+          name: llama-bin-${{ matrix.os }}-rocm-${{ matrix.rocm }}-x64.${{ matrix.os == 'win' && 'zip' || 'tar.gz' }}
+          path: ./artifact
+
+      - name: Download qualification metadata
+        uses: actions/download-artifact@v7
+        with:
+          name: qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}
+          path: ./meta
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Pin the interpreter the later steps use.
+      # Runners might carry a second Python of their own which can be earlier on the
+      # search path, so the scripts can quietly run under a different interpreter.
+      - name: Pin the interpreter
+        shell: python
+        run: |
+          import os
+          location = os.environ["pythonLocation"]
+          interpreter = (os.path.join(location, "python.exe") if os.name == "nt"
+                         else os.path.join(location, "bin", "python"))
+          if not os.path.exists(interpreter):
+              raise SystemExit(f"::error::no interpreter at {interpreter}")
+          print(f"Qualification scripts will run under {interpreter}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+              handle.write(f"QUALIFY_PYTHON={interpreter}\n")
+
+      # The archives do not contain ROCm -- a user installs it separately. Without
+      # this step the Linux binary never starts, and the Windows one is worse: a
+      # GPU backend that fails to load is not treated as an error, so llama.cpp
+      # quietly runs on the CPU and the test passes while proving nothing.
+      - name: Install a user-style ROCm runtime
+        run: >-
+          ${{ env.QUALIFY_PYTHON }} .github/qualify-rocm/install_rocm.py
+          --version ${{ matrix.rocm }}.0
+          --arch gfx1151
+          --output-json rocm-install.json
+
+      # Unpacking the archive and fetching the test model happen inside the script.
+      # A single-line `python ...` command parses the same way under every shell,
+      # so the job no longer depends on which one a given machine happens to provide.
+      - name: Run Tier 1 GPU inference
+        run: >-
+          ${{ env.QUALIFY_PYTHON }} .github/qualify-rocm/tier1_gpu.py
+          --meta meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
+          --archive-dir ./artifact
+          --gfx-target gfx1151
+          --logs-dir fragments
+          --fail-on-error
+          --output fragments/tier1-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
+
+      - name: Upload Tier 1 fragments
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualify-fragments-tier1-${{ matrix.os }}-${{ matrix.rocm }}
+          path: |
+            fragments/*.json
+            fragments/*.log
+          if-no-files-found: warn
+
+      # A cancelled run can leave llama-server alive and holding GPU memory. The
+      # script cleans up after itself on every normal exit; this is the backstop
+      # for the paths it never gets to. Harmless on a machine that is discarded
+      # after the job, and necessary on one that is not.
+      # continue-on-error because this is only a backstop: the script already
+      # stops the server itself on every path it reaches. If an earlier step
+      # failed badly enough that even the interpreter is missing, a red mark
+      # here adds noise on top of the real failure rather than information.
+      - name: Tear down
+        if: always()
+        continue-on-error: true
+        shell: python
+        run: |
+          import subprocess, sys
+          cmd = (["taskkill", "/F", "/IM", "llama-server.exe"]
+                 if sys.platform == "win32" else
+                 ["pkill", "-f", "llama-server"])
+          try:
+              subprocess.run(cmd, check=False, capture_output=True, timeout=60)
+          except (OSError, subprocess.SubprocessError) as exc:
+              print(f"cleanup skipped: {exc}")
+
   release:
     # always() overrides the default behavior of skipping this job when a
     # needed build job fails or is skipped (e.g. one CUDA sm_* matrix leg
@@ -1041,6 +1364,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     needs:
+      - resolve-upstream
       - windows-cpu
       - windows-rocm
       - windows-cuda
@@ -1048,6 +1372,8 @@ jobs:
       - ubuntu-22-cuda
       - ubuntu-22-cuda-arm64
       - ubuntu-22-openvino
+      - qualify-tier0
+      - qualify-tier1
 
     steps:
       - name: Clone
@@ -1056,10 +1382,17 @@ jobs:
         with:
           fetch-depth: 0
           repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
+
+      - name: Checkout qualification suite
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
 
       - name: Determine tag name
         id: tag
-        uses: lemonade-sdk/llama.cpp/.github/actions/get-tag-name@lemonade
+        shell: bash
+        run: echo "name=${{ needs.resolve-upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       # Downloaded in batches rather than one call: actions/download-artifact
       # starts every matched artifact concurrently, and 28 parallel extractions
@@ -1195,7 +1528,13 @@ jobs:
           # overlap with any other family's files.
           declare -A family_glob=(
             [cuda]="release/llama-${TAG}-*cuda-sm_*"
-            [rocm]="release/llama-${TAG}-bin-*rocm-*"
+            # Each ROCm version is its own family. They are independent
+            # products: a consumer downloads exactly one of them, so a gap in
+            # 7.14 is no reason to withhold a perfectly good 10.0 build. What
+            # must stay consistent is the Windows+Linux pair WITHIN a version.
+            [rocm-7.14]="release/llama-${TAG}-bin-*rocm-7.14-*"
+            [rocm-10.0]="release/llama-${TAG}-bin-*rocm-10.0-*"
+            [rocm-10.1]="release/llama-${TAG}-bin-*rocm-10.1-*"
             [openvino]="release/llama-${TAG}-bin-*openvino-*"
             [cpu]="release/llama-${TAG}-bin-win-cpu-*"
           )
@@ -1220,8 +1559,17 @@ jobs:
             check_glob cuda "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
           done
 
-          check_glob rocm "release/llama-${TAG}-bin-ubuntu-rocm-*-x64.tar.gz"
-          check_glob rocm "release/llama-${TAG}-bin-win-rocm-*-x64.zip"
+          # Enumerate every ROCm version explicitly, the way the CUDA sm_* loop
+          # above does. A bare `-rocm-*-` glob is satisfied by ANY single
+          # version, so a release missing one version entirely would still pass.
+          # That matters because a consumer asks for one exact ROCm version by
+          # name -- a missing version is a failed download on every machine
+          # that wanted it, not a graceful fallback to another one.
+          # Keep this list in step with the build matrices.
+          for rocm in 7.14 10.0 10.1; do
+            check_glob "rocm-${rocm}" "release/llama-${TAG}-bin-ubuntu-rocm-${rocm}-x64.tar.gz"
+            check_glob "rocm-${rocm}" "release/llama-${TAG}-bin-win-rocm-${rocm}-x64.zip"
+          done
           check_glob openvino "release/llama-${TAG}-bin-ubuntu-openvino-*-x64.tar.gz"
           check_glob cpu "release/llama-${TAG}-bin-win-cpu-x64.zip"
 
@@ -1250,6 +1598,110 @@ jobs:
           else
             echo "All expected artifacts present. Found $files artifact(s) ready to upload."
           fi
+
+      - name: Download qualification fragments
+        uses: actions/download-artifact@v7
+        with:
+          pattern: qualify-fragments-*
+          path: ./fragments
+          merge-multiple: true
+
+      - name: Download qualification metadata
+        uses: actions/download-artifact@v7
+        with:
+          pattern: qualify-meta-*
+          path: ./meta
+          merge-multiple: true
+
+      - name: Post-merge checks on final artifacts
+        id: post_merge
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          shopt -s nullglob
+          mkdir -p fragments
+          for archive in release/llama-${TAG}-bin-ubuntu-rocm-*.tar.gz \
+                         release/llama-${TAG}-bin-win-rocm-*.zip; do
+            base=$(basename "$archive")
+            if [[ "$base" == *-win-rocm-* ]]; then os=win; else os=ubuntu; fi
+            ver=$(sed -E 's/.*-rocm-([0-9]+\.[0-9]+)-x64\..*/\1/' <<<"$base")
+            echo "::group::Post-merge — $base"
+            python3 lemonade-ci/.github/qualify-rocm/check_post_merge.py \
+              --archive "$archive" --os "$os" --rocm-version "$ver" --tag "$TAG" \
+              --output "fragments/tier0-postmerge-$os-rocm-$ver.json" || true
+            echo "::endgroup::"
+          done
+
+      - name: Qualify ROCm release artifacts
+        id: qualify
+        continue-on-error: true
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          mkdir -p qualification
+          python3 lemonade-ci/.github/qualify-rocm/aggregate.py \
+            --fragments-dir ./fragments \
+            --tag "$TAG" \
+            --records-dir ./qualification \
+            --output-summary ./qualification/qualification-summary.json \
+            --fail-on-no-promote
+
+      - name: Drop unqualified ROCm versions
+        id: rocm_gate
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+          PROMOTE: ${{ steps.qualify.outputs.promote_rocm }}
+          BLOCKED: ${{ steps.qualify.outputs.blocked_rocm_versions }}
+        run: |
+          if [ "$PROMOTE" = "true" ]; then
+            echo "Every ROCm version qualified — all ROCm artifacts will be published."
+            echo "dropped=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The aggregate step names the versions that failed. If it could not
+          # run at all we have no evidence for any of them, so withhold the lot
+          # rather than publish something unverified.
+          blocked="$BLOCKED"
+          if [ -z "$blocked" ]; then
+            blocked="7.14 10.0 10.1"
+            echo "::warning::Qualification produced no verdict — withholding every \
+          ROCm version rather than publishing unverified artifacts."
+          fi
+
+          dropped=0
+          for version in $blocked; do
+            count=$(ls release/llama-${TAG}-bin-*rocm-${version}-* 2>/dev/null | wc -l)
+            [ "$count" -gt 0 ] || continue
+            echo "::warning::ROCm ${version} did not qualify — removing its \
+          ${count} artifact(s) from this release. Other ROCm versions and every \
+          other backend are unaffected. The attached qualification record lists \
+          the failing checks."
+            rm -fv release/llama-${TAG}-bin-*rocm-${version}-* || true
+            dropped=$((dropped + count))
+          done
+          echo "dropped=$dropped" >> "$GITHUB_OUTPUT"
+          echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+
+      # Lets a user prove the bytes they downloaded are the bytes we uploaded.
+      - name: Publish SHA-256 checksums
+        run: |
+          shopt -s nullglob
+          files=(release/*.zip release/*.tar.gz release/*.tar.xz release/*.7z)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No artifacts to checksum."
+            exit 0
+          fi
+          ( cd release && sha256sum $(for f in "${files[@]}"; do basename "$f"; done) \
+              > checksums.txt )
+          cat release/checksums.txt
+
+      - name: Stage qualification records as release assets
+        run: |
+          shopt -s nullglob
+          for record in qualification/*.json; do
+            cp -v "$record" release/
+          done
 
       # Get the release for this tag, creating it if it does not exist yet.
       # This is idempotent: if a previous run created the release but failed
@@ -1335,8 +1787,13 @@ jobs:
               }
             }
 
+            // checksums.txt and the qualification-*.json records ship alongside
+            // the archives: the first lets a user verify a download, the second
+            // records which gfx targets were present in the binary vs actually
+            // validated on hardware.
             const files = fs.readdirSync('./release').filter((f) =>
-              f.endsWith('.zip') || f.endsWith('.tar.gz') || f.endsWith('.tar.xz') || f.endsWith('.7z'));
+              f.endsWith('.zip') || f.endsWith('.tar.gz') || f.endsWith('.tar.xz') ||
+              f.endsWith('.7z') || f === 'checksums.txt' || f.endsWith('.json'));
             const wanted = new Set(files);
 
             // Reconcile existing release assets against what this run decided to
@@ -1394,4 +1851,10 @@ jobs:
         if: steps.check_artifacts.outputs.missing != '0'
         run: |
           echo "::error::${{ steps.check_artifacts.outputs.missing }} artifact(s) were missing (${{ steps.check_artifacts.outputs.summary }}) — the incomplete families were dropped from this release; other families were still published. See the 'Check release artifacts' step for the full per-file list."
+          exit 1
+
+      - name: Fail if ROCm qualification did not pass
+        if: steps.rocm_gate.outputs.dropped != '0'
+        run: |
+          echo "::error::ROCm ${{ steps.rocm_gate.outputs.blocked }} did not qualify — ${{ steps.rocm_gate.outputs.dropped }} artifact(s) were dropped from this release. Every other ROCm version and every other backend was published normally. The qualification-*.json records attached to the release list each failing check."
           exit 1
