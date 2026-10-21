@@ -1276,13 +1276,29 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Pin the interpreter the later steps use.
+      # Runners might carry a second Python of their own which can be earlier on the
+      # search path, so the scripts can quietly run under a different interpreter.
+      - name: Pin the interpreter
+        shell: python
+        run: |
+          import os
+          location = os.environ["pythonLocation"]
+          interpreter = (os.path.join(location, "python.exe") if os.name == "nt"
+                         else os.path.join(location, "bin", "python"))
+          if not os.path.exists(interpreter):
+              raise SystemExit(f"::error::no interpreter at {interpreter}")
+          print(f"Qualification scripts will run under {interpreter}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+              handle.write(f"QUALIFY_PYTHON={interpreter}\n")
+
       # The archives do not contain ROCm -- a user installs it separately. Without
       # this step the Linux binary never starts, and the Windows one is worse: a
       # GPU backend that fails to load is not treated as an error, so llama.cpp
       # quietly runs on the CPU and the test passes while proving nothing.
       - name: Install a user-style ROCm runtime
         run: >-
-          python .github/qualify-rocm/install_rocm.py
+          ${{ env.QUALIFY_PYTHON }} .github/qualify-rocm/install_rocm.py
           --version ${{ matrix.rocm }}.0
           --arch gfx1151
           --output-json rocm-install.json
@@ -1292,7 +1308,7 @@ jobs:
       # so the job no longer depends on which one a given machine happens to provide.
       - name: Run Tier 1 GPU inference
         run: >-
-          python .github/qualify-rocm/tier1_gpu.py
+          ${{ env.QUALIFY_PYTHON }} .github/qualify-rocm/tier1_gpu.py
           --meta meta/qualify-meta-${{ matrix.os }}-rocm-${{ matrix.rocm }}.json
           --archive-dir ./artifact
           --gfx-target gfx1151
