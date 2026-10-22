@@ -217,6 +217,13 @@ were actually tested on hardware, and the result of every check — so questions
 like "was this gfx target ever verified in that build?" stay answerable long after
 the CI logs have expired.
 
+## Published feed
+
+The release job's records are also published, pass or fail, to the
+`qualification-data` branch by `publish_qualification.py`, so a dashboard can
+follow the history of every run without reading each release. The layout and
+every field are described in [FEED.md](FEED.md).
+
 ## Out of scope
 
 - **Performance.** Tracked downstream against these same artifacts; a second
