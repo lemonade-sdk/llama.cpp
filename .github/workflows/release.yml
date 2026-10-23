@@ -54,6 +54,96 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Pinning this run to upstream $sha ($tag)"
 
+  # CMake does not treat an unknown -D switch as an error, so when upstream
+  # renames or removes a GGML_*/LLAMA_* option we pass, every build stays green
+  # and silently ships without whatever that option enabled. CMake's own
+  # "Manually-specified variables were not used" warning cannot catch this for
+  # GGML_* options: upstream's ggml/CMakeLists.txt reads every GGML_* variable
+  # to generate ggml-config.cmake, which marks them all as used. So check the
+  # switches against upstream's CMake sources directly instead.
+  #
+  # Nothing depends on this job. A failure turns the run red so the stale flag
+  # gets noticed, but never holds back a build or the release.
+  check-cmake-flags:
+    needs: resolve-upstream
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
+
+      - name: Checkout this workflow
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
+      # Warn-only: a flag upstream adds to its shared release args is a decision
+      # for us to make (e.g. it may pull extra downloads into the build), not
+      # something to adopt automatically. Per-job flags (packaging, backend
+      # selection) are deliberately not compared.
+      - name: Report upstream CMake arg drift
+        run: |
+          # Two-space indent anchors this to upstream's workflow-level env block,
+          # so a job-level CMAKE_ARGS override is never picked up instead.
+          theirs_raw=$(grep -oP '^  CMAKE_ARGS:\s*"\K[^"]+' .github/workflows/release.yml || true)
+          found=$(printf '%s' "$theirs_raw" | grep -c . || true)
+          if [ "$found" -ne 1 ]; then
+            echo "::warning::Expected exactly one workflow-level CMAKE_ARGS in upstream's release workflow, found $found — upstream may have restructured it. Skipping the drift comparison."
+            exit 0
+          fi
+
+          ours=$(printf '%s\n' $CMAKE_ARGS | sort -u)
+          theirs=$(printf '%s\n' $theirs_raw | sort -u)
+          added=$(comm -13 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
+          removed=$(comm -23 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
+
+          if [ -z "$added" ] && [ -z "$removed" ]; then
+            echo "Shared CMake args match upstream exactly."
+            exit 0
+          fi
+          for arg in $added; do
+            echo "::warning::Upstream release builds pass $arg but this workflow does not. Decide whether these artifacts should too."
+          done
+          for arg in $removed; do
+            echo "::warning::This workflow passes $arg but upstream release builds do not. Decide whether it is still wanted."
+          done
+
+      - name: Verify CMake flags still exist upstream
+        run: |
+          # Every GGML_*/LLAMA_* switch this workflow passes, comment lines excluded.
+          flags=$(grep -v '^[[:space:]]*#' lemonade-ci/.github/workflows/release.yml \
+            | grep -oE -- '-D(GGML|LLAMA)_[A-Z0-9_]+' | sed 's/^-D//' | sort -u)
+          if [ -z "$flags" ]; then
+            echo "::error::Found no GGML/LLAMA -D switches in this workflow — the extraction pattern is out of date."
+            exit 1
+          fi
+
+          # Upstream's CMake sources at the commit every build job compiles.
+          mapfile -t cmake_files < <(git ls-files 'CMakeLists.txt' '*/CMakeLists.txt' '*.cmake')
+          if [ ${#cmake_files[@]} -eq 0 ]; then
+            echo "::error::Found no CMake files in the upstream checkout."
+            exit 1
+          fi
+
+          # A switch that no upstream CMake file mentions anywhere cannot be
+          # doing anything. -w keeps GGML_HIP from matching inside GGML_HIP_FOO.
+          dead=()
+          for flag in $flags; do
+            grep -qw -- "$flag" "${cmake_files[@]}" || dead+=("$flag")
+          done
+
+          echo "Checked $(echo "$flags" | wc -l) switches against ${#cmake_files[@]} upstream CMake files:" $flags
+          if [ ${#dead[@]} -ne 0 ]; then
+            for flag in "${dead[@]}"; do
+              echo "::error::-D${flag} is passed by this workflow but no longer exists anywhere in upstream's CMake files (renamed or removed). Builds silently ignore it."
+            done
+            exit 1
+          fi
+          echo "Every GGML/LLAMA switch this workflow passes still exists upstream."
+
   ubuntu-24-rocm:
     needs: resolve-upstream
     runs-on: ubuntu-24.04
@@ -153,7 +243,6 @@ jobs:
             -DGPU_TARGETS="${{ matrix.gpu_targets }}" \
             -DGGML_HIP=ON \
             -DHIP_PLATFORM=amd \
-            -DGGML_HIP_ROCWMMA_FATTN=ON \
             -DGGML_OPENMP=ON \
             ${{ env.CMAKE_ARGS }}
           cmake --build build --config Release -j $(nproc)
@@ -366,6 +455,8 @@ jobs:
 
           "$smoke_bin" --version >/dev/null
 
+          # Check every binary before failing, so one run reports all the RPATH and dependency problems instead of just the first.
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -375,16 +466,21 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
             missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::CUDA package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
@@ -551,6 +647,8 @@ jobs:
 
           "$smoke_bin" --version >/dev/null
 
+          # Check every binary before failing, so one run reports all the RPATH and dependency problems instead of just the first.
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -560,16 +658,21 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
             missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::CUDA package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
@@ -596,13 +699,22 @@ jobs:
           path: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
           name: llama-ubuntu-cuda-${{ matrix.sm }}-arm64.tar.xz
 
-  ubuntu-22-openvino:
+  ubuntu-openvino:
     needs: resolve-upstream
-    runs-on: ubuntu-22.04
 
-    env:
-      OPENVINO_VERSION_MAJOR: "2026.0"
-      OPENVINO_VERSION_FULL: "2026.0.0.20965.c6d6a13a886"
+    # Two Ubuntu baselines:
+    # 24.04 is what upstream builds and validates the OpenVINO backend on,
+    # 22.04 keeps a glibc 2.35 binary for users on older distros.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            ubuntu: "22"
+          - os: ubuntu-24.04
+            ubuntu: "24"
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Clone
@@ -613,14 +725,43 @@ jobs:
           repository: 'ggml-org/llama.cpp'
           ref: ${{ needs.resolve-upstream.outputs.sha }}
 
+      - name: Resolve OpenVINO version from upstream
+        run: |
+          upstream_workflow=.github/workflows/release.yml
+          major=$(grep -oP 'OPENVINO_VERSION_MAJOR:\s*"\K[^"]+' "$upstream_workflow" | sort -u || true)
+          full=$(grep -oP 'OPENVINO_VERSION_FULL:\s*"\K[^"]+' "$upstream_workflow" | sort -u || true)
+
+          if [ "$(printf '%s' "$major" | grep -c .)" -ne 1 ] || [ "$(printf '%s' "$full" | grep -c .)" -ne 1 ]; then
+            echo "::error::Could not resolve a single OpenVINO version from upstream $upstream_workflow."
+            echo "::error::OPENVINO_VERSION_MAJOR candidates: ${major:-<none>}"
+            echo "::error::OPENVINO_VERSION_FULL candidates: ${full:-<none>}"
+            echo "::error::Upstream probably renamed these variables or split the OpenVINO jobs across files — update this step."
+            exit 1
+          fi
+
+          # The toolkit URL is <major>/linux/openvino_toolkit_<ubuntuNN>_<full>,
+          # so a major that is not a prefix of full means we would download a 404.
+          case "$full" in
+            "$major".*) ;;
+            *)
+              echo "::error::OpenVINO version mismatch upstream: full '$full' is not a build of major '$major'."
+              exit 1
+              ;;
+          esac
+
+          echo "Building against OpenVINO $full (as pinned by upstream)"
+          echo "OPENVINO_VERSION_MAJOR=$major" >> "$GITHUB_ENV"
+          echo "OPENVINO_VERSION_FULL=$full" >> "$GITHUB_ENV"
+
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
         with:
-          key: ubuntu-openvino
+          key: ubuntu-${{ matrix.ubuntu }}-openvino
           evict-old-files: 1d
 
       - name: Dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build patchelf \
             python3-pip libtbb12 \
             ocl-icd-opencl-dev opencl-headers opencl-clhpp-headers intel-opencl-icd
@@ -631,6 +772,7 @@ jobs:
           path: ${{ github.workspace }}/openvino
           version_major: ${{ env.OPENVINO_VERSION_MAJOR }}
           version_full: ${{ env.OPENVINO_VERSION_FULL }}
+          ubuntu_version: ubuntu${{ matrix.ubuntu }}
 
       - name: Install OpenVINO dependencies
         run: |
@@ -700,6 +842,8 @@ jobs:
           fi
           "$smoke_bin" --version >/dev/null
 
+          # Check every binary before failing, so one run reports all the RPATH and dependency problems instead of just the first.
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -709,17 +853,24 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
-            # libOpenCL is optional (Intel GPU acceleration); skip it
-            missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libOpenCL.so.1" { print }')
+            # Both of these come from the user's Intel driver stack, so they are never bundled.
+            # libOpenCL from the GPU driver (GPU acceleration), libze_loader (Level Zero) from the NPU driver,
+            # needed only by libopenvino_intel_npu_vm_runtime.so, which OpenVINO 2026.4+ ships.
+            missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libOpenCL.so.1" && $1 != "libze_loader.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::OpenVINO package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
@@ -729,15 +880,15 @@ jobs:
       - name: Pack artifacts
         run: |
           cp LICENSE ./build/bin/
-          tar -czvf llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz \
+          tar -czvf llama-bin-ubuntu-${{ matrix.ubuntu }}-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz \
             --transform "s,./,llama-${{ steps.tag.outputs.name }}/," \
             -C ./build/bin .
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          path: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
-          name: llama-bin-ubuntu-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
+          path: llama-bin-ubuntu-${{ matrix.ubuntu }}-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
+          name: llama-bin-ubuntu-${{ matrix.ubuntu }}-openvino-${{ env.OPENVINO_VERSION_MAJOR }}-x64.tar.gz
 
   windows-cpu:
     needs: resolve-upstream
@@ -930,7 +1081,6 @@ jobs:
             -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
             -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
             -DHIP_PATH="${env:HIP_PATH}" `
-            -DGGML_HIP_ROCWMMA_FATTN=ON `
             -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}"
           cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
 
@@ -1371,7 +1521,7 @@ jobs:
       - ubuntu-24-rocm
       - ubuntu-22-cuda
       - ubuntu-22-cuda-arm64
-      - ubuntu-22-openvino
+      - ubuntu-openvino
       - qualify-tier0
       - qualify-tier1
 
@@ -1535,7 +1685,10 @@ jobs:
             [rocm-7.14]="release/llama-${TAG}-bin-*rocm-7.14-*"
             [rocm-10.0]="release/llama-${TAG}-bin-*rocm-10.0-*"
             [rocm-10.1]="release/llama-${TAG}-bin-*rocm-10.1-*"
-            [openvino]="release/llama-${TAG}-bin-*openvino-*"
+            # The two Ubuntu baselines are separate families.
+            # They target different glibc versions, so a gap in one is no reason to withhold the other.
+            [openvino-22]="release/llama-${TAG}-bin-ubuntu-22-openvino-*"
+            [openvino-24]="release/llama-${TAG}-bin-ubuntu-24-openvino-*"
             [cpu]="release/llama-${TAG}-bin-win-cpu-*"
           )
 
@@ -1549,11 +1702,12 @@ jobs:
 
           # Each backend family is checked independently, but must be
           # published as a complete, internally-consistent set across every
-          # platform/variant it covers (e.g. all 7 CUDA sm_* builds for
+          # platform/variant it covers (e.g. all 8 CUDA sm_* builds for
           # ubuntu x64/arm64 and windows) — never a partial mix. A gap in one
           # family drops that whole family from the release; other families
-          # are unaffected.
-          for sm in sm_75 sm_80 sm_86 sm_89 sm_90 sm_100 sm_120; do
+          # are unaffected. Keep this sm_* list in step with the three CUDA
+          # build matrices, or an arch can be built but never verified.
+          for sm in sm_75 sm_80 sm_86 sm_89 sm_90 sm_100 sm_120 sm_121; do
             check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
             check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
             check_glob cuda "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
@@ -1570,7 +1724,8 @@ jobs:
             check_glob "rocm-${rocm}" "release/llama-${TAG}-bin-ubuntu-rocm-${rocm}-x64.tar.gz"
             check_glob "rocm-${rocm}" "release/llama-${TAG}-bin-win-rocm-${rocm}-x64.zip"
           done
-          check_glob openvino "release/llama-${TAG}-bin-ubuntu-openvino-*-x64.tar.gz"
+          check_glob openvino-22 "release/llama-${TAG}-bin-ubuntu-22-openvino-*-x64.tar.gz"
+          check_glob openvino-24 "release/llama-${TAG}-bin-ubuntu-24-openvino-*-x64.tar.gz"
           check_glob cpu "release/llama-${TAG}-bin-win-cpu-x64.zip"
 
           missing=0
@@ -1728,6 +1883,20 @@ jobs:
           script: |
             const tag = process.env.TAG_NAME;
             const { owner, repo } = context.repo;
+
+            // The OpenVINO version is resolved from upstream at build time, so it is not known here.
+            // Derive the download links from the files actually staged for this release
+            // instead of hardcoding a version that goes stale (and 404s) the next time it moves.
+            const fs = require('fs');
+            const openvinoLinks = (fs.existsSync('release') ? fs.readdirSync('release') : [])
+              .filter(f => f.includes('-openvino-') && f.endsWith('.tar.gz'))
+              .sort()
+              .map(f => {
+                const m = f.match(/-bin-ubuntu-(\d+)-openvino-(.+)-x64\.tar\.gz$/);
+                const label = m ? `Ubuntu ${m[1]}.04 x64 (OpenVINO ${m[2]})` : f;
+                return `- [${label}](https://github.com/${owner}/${repo}/releases/download/${tag}/${f})`;
+              });
+
             let release;
             try {
               release = (await github.rest.repos.getReleaseByTag({ owner, repo, tag })).data;
@@ -1747,7 +1916,7 @@ jobs:
                 `- [Ubuntu x64 (ROCm 10.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-rocm-10.1-x64.tar.gz)`,
                 '- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` (replace XX with your GPU compute capability)',
                 '- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` (replace XX with your GPU compute capability)',
-                `- [Ubuntu x64 (OpenVINO 2026.0)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-openvino-2026.0-x64.tar.gz)`,
+                ...openvinoLinks,
                 '',
                 '**Windows:**',
                 `- [Windows x64 (ROCm 7.14)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-7.14-x64.zip)`,
