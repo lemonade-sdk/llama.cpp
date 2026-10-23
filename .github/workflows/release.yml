@@ -455,6 +455,8 @@ jobs:
 
           "$smoke_bin" --version >/dev/null
 
+          # Check every binary before failing, so one run reports all the RPATH and dependency problems instead of just the first.
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -464,16 +466,21 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
             missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::CUDA package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
@@ -640,6 +647,8 @@ jobs:
 
           "$smoke_bin" --version >/dev/null
 
+          # Check every binary before failing, so one run reports all the RPATH and dependency problems instead of just the first.
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -649,16 +658,21 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
             missing=$(ldd "$f" | awk '/=> not found/ && $1 != "libcuda.so.1" { print }')
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::CUDA package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
@@ -828,6 +842,8 @@ jobs:
           fi
           "$smoke_bin" --version >/dev/null
 
+          # Check every binary before failing, so one run reports all the RPATH and dependency problems instead of just the first.
+          problems=0
           for f in build/bin/*; do
             [ -f "$f" ] && ! [ -L "$f" ] || continue
             if ! file "$f" | grep -q 'ELF'; then
@@ -837,7 +853,7 @@ jobs:
             rpath=$(patchelf --print-rpath "$f")
             if [ "$rpath" != '$ORIGIN' ]; then
               echo "::error::Unexpected RPATH '$rpath' for $f"
-              exit 1
+              problems=$((problems + 1))
             fi
 
             # Both of these come from the user's Intel driver stack, so they are never bundled.
@@ -847,9 +863,14 @@ jobs:
             if [ -n "$missing" ]; then
               echo "::error::Unresolved runtime dependencies for $f"
               echo "$missing"
-              exit 1
+              problems=$((problems + 1))
             fi
           done
+
+          if [ "$problems" -ne 0 ]; then
+            echo "::error::OpenVINO package validation found $problems problem(s) — see the errors above."
+            exit 1
+          fi
 
       - name: Determine tag name
         id: tag
