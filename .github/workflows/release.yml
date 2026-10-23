@@ -54,6 +54,96 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Pinning this run to upstream $sha ($tag)"
 
+  # CMake does not treat an unknown -D switch as an error, so when upstream
+  # renames or removes a GGML_*/LLAMA_* option we pass, every build stays green
+  # and silently ships without whatever that option enabled. CMake's own
+  # "Manually-specified variables were not used" warning cannot catch this for
+  # GGML_* options: upstream's ggml/CMakeLists.txt reads every GGML_* variable
+  # to generate ggml-config.cmake, which marks them all as used. So check the
+  # switches against upstream's CMake sources directly instead.
+  #
+  # Nothing depends on this job. A failure turns the run red so the stale flag
+  # gets noticed, but never holds back a build or the release.
+  check-cmake-flags:
+    needs: resolve-upstream
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          repository: 'ggml-org/llama.cpp'
+          ref: ${{ needs.resolve-upstream.outputs.sha }}
+
+      - name: Checkout this workflow
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
+      # Warn-only: a flag upstream adds to its shared release args is a decision
+      # for us to make (e.g. it may pull extra downloads into the build), not
+      # something to adopt automatically. Per-job flags (packaging, backend
+      # selection) are deliberately not compared.
+      - name: Report upstream CMake arg drift
+        run: |
+          # Two-space indent anchors this to upstream's workflow-level env block,
+          # so a job-level CMAKE_ARGS override is never picked up instead.
+          theirs_raw=$(grep -oP '^  CMAKE_ARGS:\s*"\K[^"]+' .github/workflows/release.yml || true)
+          found=$(printf '%s' "$theirs_raw" | grep -c . || true)
+          if [ "$found" -ne 1 ]; then
+            echo "::warning::Expected exactly one workflow-level CMAKE_ARGS in upstream's release workflow, found $found — upstream may have restructured it. Skipping the drift comparison."
+            exit 0
+          fi
+
+          ours=$(printf '%s\n' $CMAKE_ARGS | sort -u)
+          theirs=$(printf '%s\n' $theirs_raw | sort -u)
+          added=$(comm -13 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
+          removed=$(comm -23 <(printf '%s\n' "$ours") <(printf '%s\n' "$theirs"))
+
+          if [ -z "$added" ] && [ -z "$removed" ]; then
+            echo "Shared CMake args match upstream exactly."
+            exit 0
+          fi
+          for arg in $added; do
+            echo "::warning::Upstream release builds pass $arg but this workflow does not. Decide whether these artifacts should too."
+          done
+          for arg in $removed; do
+            echo "::warning::This workflow passes $arg but upstream release builds do not. Decide whether it is still wanted."
+          done
+
+      - name: Verify CMake flags still exist upstream
+        run: |
+          # Every GGML_*/LLAMA_* switch this workflow passes, comment lines excluded.
+          flags=$(grep -v '^[[:space:]]*#' lemonade-ci/.github/workflows/release.yml \
+            | grep -oE -- '-D(GGML|LLAMA)_[A-Z0-9_]+' | sed 's/^-D//' | sort -u)
+          if [ -z "$flags" ]; then
+            echo "::error::Found no GGML/LLAMA -D switches in this workflow — the extraction pattern is out of date."
+            exit 1
+          fi
+
+          # Upstream's CMake sources at the commit every build job compiles.
+          mapfile -t cmake_files < <(git ls-files 'CMakeLists.txt' '*/CMakeLists.txt' '*.cmake')
+          if [ ${#cmake_files[@]} -eq 0 ]; then
+            echo "::error::Found no CMake files in the upstream checkout."
+            exit 1
+          fi
+
+          # A switch that no upstream CMake file mentions anywhere cannot be
+          # doing anything. -w keeps GGML_HIP from matching inside GGML_HIP_FOO.
+          dead=()
+          for flag in $flags; do
+            grep -qw -- "$flag" "${cmake_files[@]}" || dead+=("$flag")
+          done
+
+          echo "Checked $(echo "$flags" | wc -l) switches against ${#cmake_files[@]} upstream CMake files:" $flags
+          if [ ${#dead[@]} -ne 0 ]; then
+            for flag in "${dead[@]}"; do
+              echo "::error::-D${flag} is passed by this workflow but no longer exists anywhere in upstream's CMake files (renamed or removed). Builds silently ignore it."
+            done
+            exit 1
+          fi
+          echo "Every GGML/LLAMA switch this workflow passes still exists upstream."
+
   ubuntu-24-rocm:
     needs: resolve-upstream
     runs-on: ubuntu-24.04
@@ -153,7 +243,6 @@ jobs:
             -DGPU_TARGETS="${{ matrix.gpu_targets }}" \
             -DGGML_HIP=ON \
             -DHIP_PLATFORM=amd \
-            -DGGML_HIP_ROCWMMA_FATTN=ON \
             -DGGML_OPENMP=ON \
             ${{ env.CMAKE_ARGS }}
           cmake --build build --config Release -j $(nproc)
@@ -971,7 +1060,6 @@ jobs:
             -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
             -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
             -DHIP_PATH="${env:HIP_PATH}" `
-            -DGGML_HIP_ROCWMMA_FATTN=ON `
             -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}"
           cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
 
