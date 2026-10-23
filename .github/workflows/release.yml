@@ -1646,6 +1646,16 @@ jobs:
             --output-summary ./qualification/qualification-summary.json \
             --fail-on-no-promote
 
+      # Hand the records to publish-qualification, which adds them to the dashboard feed.
+      # Uploaded straight after they are written so that a failure in any later step of this job cannot keep them out of the feed.
+      - name: Upload qualification records
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-records
+          path: qualification/*.json
+          if-no-files-found: warn
+
       - name: Drop unqualified ROCm versions
         id: rocm_gate
         env:
@@ -1858,3 +1868,96 @@ jobs:
         run: |
           echo "::error::ROCm ${{ steps.rocm_gate.outputs.blocked }} did not qualify — ${{ steps.rocm_gate.outputs.dropped }} artifact(s) were dropped from this release. Every other ROCm version and every other backend was published normally. The qualification-*.json records attached to the release list each failing check."
           exit 1
+
+  # ---------------------------------------------------------------------------
+  # Publish this run's ROCm qualification records to the qualification-data branch, where the dashboard polls them.
+  # Every record is published irrespective of it passing or failing.
+  # A feed that only held the runs that shipped would show nothing but successes.
+  # The format is described in .github/qualify-rocm/FEED.md.
+  # ---------------------------------------------------------------------------
+  publish-qualification:
+    # The release job goes red whenever any backend family is incomplete, which says
+    # nothing about the ROCm records it wrote, so publish after either outcome.
+    # Skipped along with the release job on pull requests and on dispatches
+    # without create_release so neither produces records.
+    if: ${{ always() && (needs.release.result == 'success' || needs.release.result == 'failure') }}
+
+    needs:
+      - resolve-upstream
+      - release
+
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write # to push to the qualification-data branch
+
+    steps:
+      - name: Checkout qualification suite
+        uses: actions/checkout@v6
+        with:
+          path: lemonade-ci
+
+      - name: Download qualification records
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: qualification-records
+          path: ./records
+
+      - name: Publish to qualification-data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve-upstream.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          records=(records/qualification-*.json)
+          if [ ${#records[@]} -eq 0 ]; then
+            echo "::warning::The release job produced no qualification records, so there is nothing to publish."
+            exit 0
+          fi
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          BRANCH="qualification-data"
+
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            rm -rf data
+            found=0
+            git ls-remote --exit-code --heads "$REPO_URL" "$BRANCH" >/dev/null || found=$?
+            if [ "$found" -eq 0 ]; then
+              if ! git clone --quiet --depth 1 --branch "$BRANCH" "$REPO_URL" data; then
+                echo "Clone failed (attempt $attempt); retrying"; sleep $((attempt * 3)); continue
+              fi
+            elif [ "$found" -eq 2 ]; then
+              echo "$BRANCH does not exist yet; creating it"
+              git init --quiet data
+              git -C data checkout --quiet --orphan "$BRANCH"
+              git -C data remote add origin "$REPO_URL"
+            else
+              echo "Could not reach the repository (attempt $attempt); retrying"; sleep $((attempt * 3)); continue
+            fi
+
+            python3 lemonade-ci/.github/qualify-rocm/publish_qualification.py \
+              --records-dir records \
+              --data-dir data/qualification
+            # Keep the format description next to the data it describes.
+            cp lemonade-ci/.github/qualify-rocm/FEED.md data/qualification/SCHEMA.md
+
+            git -C data add -A
+            if git -C data diff --cached --quiet; then
+              echo "Nothing changed; the feed already holds this run."
+              pushed=1; break
+            fi
+            git -C data commit --quiet -m "qualification: run ${{ github.run_id }} (${TAG})"
+            if git -C data push --quiet origin "$BRANCH"; then
+              pushed=1; break
+            fi
+            echo "Push rejected (attempt $attempt), most likely because another run published first; retrying"
+            sleep $((attempt * 3))
+          done
+
+          [ "$pushed" = 1 ] || { echo "::error::Could not publish to $BRANCH after 5 attempts."; exit 1; }
+          echo "Feed: https://raw.githubusercontent.com/${{ github.repository }}/${BRANCH}/qualification/index.json"
