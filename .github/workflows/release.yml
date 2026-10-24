@@ -841,15 +841,8 @@ jobs:
           repository: 'ggml-org/llama.cpp'
           ref: ${{ needs.resolve-upstream.outputs.sha }}
 
-      - name: Cache ROCm Installation
-        id: cache-rocm
-        uses: actions/cache@v4
-        with:
-          path: C:\TheRock\build
-          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-${{ runner.os }}-v2
-
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.16
+        uses: ggml-org/ccache-action@v1.2.21
         with:
           key: windows-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
@@ -857,13 +850,23 @@ jobs:
           # overflowing the 500MB default and thrashing the cache across runs.
           max-size: "2G"
 
+      - name: Tune ccache for reinstalled ROCm toolchain
+        run: |
+          # Same fix as ubuntu-24-rocm.
+          # pip writes every file it installs with a fresh mtime, and clang.exe comes from the rocm-sdk-core wheel, so each install gives the compiler a new mtime.
+          # With the default compiler_check=mtime, that turns every lookup into a miss and a warm build into a 2-4h cold one; hash compiler contents instead.
+          ccache --set-config=compiler_check=content
+          if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
+          ccache --set-config=sloppiness=time_macros,include_file_mtime,include_file_ctime
+          if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
+
       - name: Install ROCm with Wheels
-        if: steps.cache-rocm.outputs.cache-hit != 'true'
         run: |
           $ErrorActionPreference = "Stop"
           write-host "Setting up Python virtual environment"
 
-          # Create the venv directly at the cache location to avoid relocation issues
+          # Keep the install at the same fixed path every run.
+          # ccache hashes the absolute include paths, so a path that moved would miss every time.
           New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
           python -m venv C:\TheRock\build\.venv
           & C:\TheRock\build\.venv\Scripts\Activate.ps1
@@ -875,7 +878,7 @@ jobs:
           # Install ROCm wheels for multi-arch support (this may take several minutes)
           python -m pip install --index-url ${{ matrix.repo }} "rocm[libraries,devel]==${{ matrix.ROCM_VERSION }}"
 
-          # Pre-expand the devel tree so it is included in the cache
+          # Expand the devel tree (compilers, headers) now so a failure surfaces here
           write-host "Initializing ROCm devel tree"
           rocm-sdk init
           if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
@@ -885,7 +888,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Activate venv from cache or fresh install
+          # Activate the venv created by the install step
           & C:\TheRock\build\.venv\Scripts\Activate.ps1
 
           # Expand the devel tree (idempotent; no-op if already done during install)
