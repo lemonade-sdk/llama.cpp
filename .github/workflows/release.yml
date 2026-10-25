@@ -102,6 +102,9 @@ jobs:
           # builds hit.
           ccache --set-config=compiler_check=content
           ccache --set-config=sloppiness=time_macros,include_file_mtime,include_file_ctime
+          # Only reuse a cached result if the source file and every file it includes are unchanged.
+          # ccache's fallback check cannot see GPU-only code on ROCm 10.1, so it could reuse a result with old GPU code, which is not we want.
+          ccache --set-config=depend_mode=true
 
       - name: Dependencies
         id: depends
@@ -858,6 +861,9 @@ jobs:
           ccache --set-config=compiler_check=content
           if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
           ccache --set-config=sloppiness=time_macros,include_file_mtime,include_file_ctime
+          if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
+          # Same as ubuntu-24-rocm: never reuse a result with old GPU code.
+          ccache --set-config=depend_mode=true
           if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
 
       - name: Install ROCm with Wheels
