@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-26T00:42:53Z",
+  "generated_at": "2026-10-26T14:07:58Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@40248146220",
-    "artifact": "llama-b11889-bin-ubuntu-rocm-10.0-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@40330582581",
+    "artifact": "llama-b11900-bin-ubuntu-rocm-10.0-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.0",
-    "llamacpp_tag": "b11889",
-    "upstream_sha": "d854d98bae598388ecea1ed84396587e5edc326d",
+    "llamacpp_tag": "b11900",
+    "upstream_sha": "74b104c9ba5717116b7e65e0cd35397778653304",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40248146220",
+    "run_id": "40330582581",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 284469682
+            "bytes": 284475213
           }
         },
         {
@@ -112,7 +112,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 12329,
+          "duration_ms": 21989,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
@@ -247,7 +247,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 8,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -265,7 +265,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 6,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -332,7 +332,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 2,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "leaked": {}
@@ -344,7 +344,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 13,
+          "duration_ms": 20,
           "error": null,
           "details": {
             "returncode": 0,
@@ -363,9 +363,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b11889",
+            "inner_dir_tag": "b11900",
             "top_level": [
-              "llama-b11889"
+              "llama-b11900"
             ]
           }
         },
@@ -375,7 +375,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 6,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -448,7 +448,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 606,
+          "duration_ms": 751,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -465,7 +465,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 538,
+          "duration_ms": 667,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",

@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-26T00:42:53Z",
+  "generated_at": "2026-10-26T14:07:58Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40248146220",
-    "artifact": "llama-b11889-bin-win-rocm-7.14-x64.zip",
+    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40330582581",
+    "artifact": "llama-b11900-bin-win-rocm-7.14-x64.zip",
     "os": "win",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b11889",
-    "upstream_sha": "d854d98bae598388ecea1ed84396587e5edc326d",
+    "llamacpp_tag": "b11900",
+    "upstream_sha": "74b104c9ba5717116b7e65e0cd35397778653304",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40248146220",
+    "run_id": "40330582581",
     "run_attempt": "1"
   },
   "overall": "warn",
@@ -72,9 +72,9 @@
           "duration_ms": 0,
           "error": null,
           "details": {
-            "entries": 99,
+            "entries": 102,
             "missing": [],
-            "bytes": 216163628
+            "bytes": 216403380
           }
         },
         {
@@ -84,11 +84,11 @@
           "status": "warn",
           "gating": true,
           "duration_ms": 0,
-          "error": "25 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
+          "error": "28 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
           "details": {
-            "entries": 96,
+            "entries": 99,
             "missing": [],
-            "test_binaries_shipped": 25,
+            "test_binaries_shipped": 28,
             "test_binaries": [
               "test-alloc.exe",
               "test-arg-parser.exe",
@@ -123,7 +123,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 16843,
+          "duration_ms": 14781,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
@@ -237,10 +237,10 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 296,
+          "duration_ms": 593,
           "error": null,
           "details": {
-            "binaries_scanned": 95,
+            "binaries_scanned": 98,
             "rocm_runtime_required": [
               "amdhip64_7.dll",
               "hipblas.dll"
@@ -274,7 +274,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 62,
+          "duration_ms": 702,
           "error": null,
           "details": {
             "returncode": 0,
@@ -377,9 +377,11 @@
               "test-chat-peg-parser.exe",
               "test-chat-template.exe",
               "test-export-graph-ops.exe",
+              "test-fusion.exe",
               "test-gguf.exe",
               "test-jinja.exe",
               "test-json-schema.exe",
+              "test-llama-archs.exe",
               "test-llama-context.exe",
               "test-log.exe",
               "test-model-load-cancel.exe",
@@ -388,6 +390,7 @@
               "test-mtmd-impl.exe",
               "test-opt.exe",
               "test-peg-parser.exe",
+              "test-speculative-rejection-sampling.exe",
               "test-thread-safety.exe",
               "test-tiled-mulmat.exe",
               "test-tokenizer-0.exe"
@@ -400,7 +403,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 343,
+          "duration_ms": 593,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -451,7 +454,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 16,
+          "duration_ms": 30,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -472,7 +475,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 890,
+          "duration_ms": 1358,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -489,7 +492,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 531,
+          "duration_ms": 953,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
