@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-27T00:43:33Z",
+  "generated_at": "2026-10-27T12:39:10Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40424669715",
-    "artifact": "llama-b11913-bin-win-rocm-7.14-x64.zip",
+    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40501231559",
+    "artifact": "llama-b11932-bin-win-rocm-7.14-x64.zip",
     "os": "win",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b11913",
-    "upstream_sha": "7aca0d2ea8d92b56911233b822db01f9fbb1ae50",
+    "llamacpp_tag": "b11932",
+    "upstream_sha": "0c8c59ef3d1b7a5c073f3cd1c2fe28d4fa960c89",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40424669715",
+    "run_id": "40501231559",
     "run_attempt": "1"
   },
   "overall": "warn",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 102,
             "missing": [],
-            "bytes": 216395443
+            "bytes": 216437553
           }
         },
         {
@@ -114,7 +114,7 @@
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1023774720
+            "bytes": 1023858688
           }
         },
         {
@@ -123,11 +123,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 16733,
+          "duration_ms": 16812,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1023774720,
+            "bytes_scanned": 1023858688,
             "bundle_magic_count": 141,
             "expected_count": 20,
             "present_count": 20,
@@ -208,7 +208,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 16,
+          "duration_ms": 0,
           "error": null,
           "details": {
             "count": 14,
@@ -274,11 +274,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 46,
+          "duration_ms": 47,
           "error": null,
           "details": {
             "returncode": 0,
-            "help_bytes": 60469,
+            "help_bytes": 60758,
             "flags_checked": 12,
             "flags_missing": []
           }
@@ -454,7 +454,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 15,
+          "duration_ms": 14,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -475,7 +475,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 1109,
+          "duration_ms": 719,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -492,7 +492,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 546,
+          "duration_ms": 516,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
