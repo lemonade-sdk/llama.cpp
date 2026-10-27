@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-26T14:07:58Z",
+  "generated_at": "2026-10-27T00:43:33Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@40330582581",
-    "artifact": "llama-b11900-bin-ubuntu-rocm-7.14-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@40424669715",
+    "artifact": "llama-b11913-bin-ubuntu-rocm-7.14-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b11900",
-    "upstream_sha": "74b104c9ba5717116b7e65e0cd35397778653304",
+    "llamacpp_tag": "b11913",
+    "upstream_sha": "7aca0d2ea8d92b56911233b822db01f9fbb1ae50",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40330582581",
+    "run_id": "40424669715",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 283038879
+            "bytes": 283007661
           }
         },
         {
@@ -112,7 +112,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 21797,
+          "duration_ms": 21879,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
@@ -332,7 +332,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "leaked": {}
@@ -363,9 +363,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b11900",
+            "inner_dir_tag": "b11913",
             "top_level": [
-              "llama-b11900"
+              "llama-b11913"
             ]
           }
         },
@@ -448,7 +448,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 778,
+          "duration_ms": 595,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -465,7 +465,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 640,
+          "duration_ms": 531,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
