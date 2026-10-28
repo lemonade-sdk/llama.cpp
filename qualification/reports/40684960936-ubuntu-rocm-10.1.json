@@ -1,0 +1,563 @@
+{
+  "schema_version": 1,
+  "kind": "qualification_record",
+  "generated_at": "2026-10-28T12:40:46Z",
+  "build": {
+    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@40684960936",
+    "artifact": "llama-b11960-bin-ubuntu-rocm-10.1-x64.tar.gz",
+    "os": "ubuntu",
+    "rocm_version": "10.1",
+    "llamacpp_tag": "b11960",
+    "upstream_sha": "8642541b255bfb5dc39cd351a178be09013a55d6",
+    "gfx_target": "gfx1151",
+    "hardware_validated": true,
+    "run_id": "40684960936",
+    "run_attempt": "1"
+  },
+  "overall": "pass",
+  "promoted": true,
+  "counts": {
+    "pass": 16,
+    "fail": 0,
+    "warn": 0,
+    "skip": 1,
+    "total": 17
+  },
+  "tiers": {
+    "tier0": {
+      "status": "pass",
+      "tier_name": "Static artifact verification",
+      "counts": {
+        "pass": 11,
+        "fail": 0,
+        "warn": 0,
+        "skip": 1,
+        "total": 12
+      },
+      "tests": [
+        {
+          "id": "T0.10",
+          "name": "Windows CPU-backend merge landed",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "cpu_variants": 14,
+            "names": [
+              "libggml-cpu-alderlake.so",
+              "libggml-cpu-cannonlake.so",
+              "libggml-cpu-cascadelake.so",
+              "libggml-cpu-cooperlake.so",
+              "libggml-cpu-haswell.so",
+              "libggml-cpu-icelake.so",
+              "libggml-cpu-ivybridge.so",
+              "libggml-cpu-piledriver.so",
+              "libggml-cpu-sandybridge.so",
+              "libggml-cpu-sapphirerapids.so",
+              "libggml-cpu-skylakex.so",
+              "libggml-cpu-sse42.so",
+              "libggml-cpu-x64.so",
+              "libggml-cpu-zen4.so"
+            ]
+          }
+        },
+        {
+          "id": "T0.11",
+          "name": "final archive integrity",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "entries": 51,
+            "missing": [],
+            "bytes": 290472928
+          }
+        },
+        {
+          "id": "T0.1",
+          "name": "archive contents",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "entries": 61,
+            "missing": [],
+            "test_binaries_shipped": 0,
+            "test_binaries": []
+          }
+        },
+        {
+          "id": "T0.2",
+          "name": "HIP backend present",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "backend": "libggml-hip.so",
+            "exists": true,
+            "bytes": 1407107288
+          }
+        },
+        {
+          "id": "T0.3",
+          "name": "gfx target audit",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 14081,
+          "error": null,
+          "details": {
+            "binary": "libggml-hip.so",
+            "bytes_scanned": 1407107288,
+            "bundle_magic_count": 141,
+            "expected_count": 27,
+            "present_count": 27,
+            "expected": [
+              "gfx1010",
+              "gfx1011",
+              "gfx1012",
+              "gfx1030",
+              "gfx1031",
+              "gfx1032",
+              "gfx1033",
+              "gfx1034",
+              "gfx1035",
+              "gfx1036",
+              "gfx1100",
+              "gfx1101",
+              "gfx1102",
+              "gfx1103",
+              "gfx1150",
+              "gfx1151",
+              "gfx1152",
+              "gfx1153",
+              "gfx1200",
+              "gfx1201",
+              "gfx900",
+              "gfx906",
+              "gfx908",
+              "gfx90a",
+              "gfx90c",
+              "gfx942",
+              "gfx950"
+            ],
+            "present": [
+              "gfx1010",
+              "gfx1011",
+              "gfx1012",
+              "gfx1030",
+              "gfx1031",
+              "gfx1032",
+              "gfx1033",
+              "gfx1034",
+              "gfx1035",
+              "gfx1036",
+              "gfx1100",
+              "gfx1101",
+              "gfx1102",
+              "gfx1103",
+              "gfx1150",
+              "gfx1151",
+              "gfx1152",
+              "gfx1153",
+              "gfx1200",
+              "gfx1201",
+              "gfx900",
+              "gfx906",
+              "gfx908",
+              "gfx90a",
+              "gfx90c",
+              "gfx942",
+              "gfx950"
+            ],
+            "missing": [],
+            "extra": [],
+            "entries_per_target": {
+              "gfx1010": 141,
+              "gfx1011": 141,
+              "gfx1012": 141,
+              "gfx1030": 141,
+              "gfx1031": 141,
+              "gfx1032": 141,
+              "gfx1033": 141,
+              "gfx1034": 141,
+              "gfx1035": 141,
+              "gfx1036": 141,
+              "gfx1100": 141,
+              "gfx1101": 141,
+              "gfx1102": 141,
+              "gfx1103": 141,
+              "gfx1150": 141,
+              "gfx1151": 141,
+              "gfx1152": 141,
+              "gfx1153": 141,
+              "gfx1200": 141,
+              "gfx1201": 141,
+              "gfx900": 141,
+              "gfx906": 141,
+              "gfx908": 141,
+              "gfx90a": 141,
+              "gfx90c": 141,
+              "gfx942": 141,
+              "gfx950": 141
+            },
+            "entry_count_uniform": true
+          }
+        },
+        {
+          "id": "T0.4",
+          "name": "CPU backend variants",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "count": 14,
+            "variants": [
+              "libggml-cpu-alderlake.so",
+              "libggml-cpu-cannonlake.so",
+              "libggml-cpu-cascadelake.so",
+              "libggml-cpu-cooperlake.so",
+              "libggml-cpu-haswell.so",
+              "libggml-cpu-icelake.so",
+              "libggml-cpu-ivybridge.so",
+              "libggml-cpu-piledriver.so",
+              "libggml-cpu-sandybridge.so",
+              "libggml-cpu-sapphirerapids.so",
+              "libggml-cpu-skylakex.so",
+              "libggml-cpu-sse42.so",
+              "libggml-cpu-x64.so",
+              "libggml-cpu-zen4.so"
+            ],
+            "post_merge": false
+          }
+        },
+        {
+          "id": "T0.5",
+          "name": "runtime dependency survey",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 3,
+          "error": null,
+          "details": {
+            "binaries_scanned": 50,
+            "rocm_runtime_required": [
+              "libamdhip64.so.7",
+              "libhipblas.so.3",
+              "librocblas.so.5"
+            ],
+            "unresolved": {}
+          }
+        },
+        {
+          "id": "T0.6",
+          "name": "Linux version support",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 3,
+          "error": null,
+          "details": {
+            "glibc_required": "2.38",
+            "glibc_allowed": "2.39",
+            "oldest_supported_distro": "Ubuntu 24.04",
+            "required_by": "ggml-rpc-server",
+            "per_file": {
+              "ggml-rpc-server": "2.38",
+              "libggml-base.so.0.28.0": "2.38",
+              "libggml-cpu-alderlake.so": "2.38",
+              "libggml-cpu-cannonlake.so": "2.38",
+              "libggml-cpu-cascadelake.so": "2.38",
+              "libggml-cpu-cooperlake.so": "2.38",
+              "libggml-cpu-haswell.so": "2.38",
+              "libggml-cpu-icelake.so": "2.38",
+              "libggml-cpu-ivybridge.so": "2.38",
+              "libggml-cpu-piledriver.so": "2.38",
+              "libggml-cpu-sandybridge.so": "2.38",
+              "libggml-cpu-sapphirerapids.so": "2.38",
+              "libggml-cpu-skylakex.so": "2.38",
+              "libggml-cpu-sse42.so": "2.38",
+              "libggml-cpu-x64.so": "2.38",
+              "libggml-cpu-zen4.so": "2.38",
+              "libggml-hip.so": "2.38",
+              "libggml-rpc.so": "2.38",
+              "libggml.so.0.28.0": "2.34",
+              "libllama-batched-bench-impl.so": "2.4",
+              "libllama-bench-impl.so": "2.38",
+              "libllama-cli-impl.so": "2.38",
+              "libllama-common.so.0.8.0": "2.38",
+              "libllama-completion-impl.so": "2.32",
+              "libllama-fit-params-impl.so": "2.4",
+              "libllama-perplexity-impl.so": "2.38",
+              "libllama-quantize-impl.so": "2.38",
+              "libllama-server-impl.so": "2.38",
+              "libllama.so.0.8.0": "2.38",
+              "libmtmd.so.0.8.0": "2.38",
+              "llama": "2.34",
+              "llama-batched-bench": "2.34",
+              "llama-bench": "2.34",
+              "llama-cli": "2.34",
+              "llama-completion": "2.34",
+              "llama-fit-params": "2.34",
+              "llama-gemma3-cli": "2.34",
+              "llama-gguf-split": "2.38",
+              "llama-imatrix": "2.38",
+              "llama-llava-cli": "2.34",
+              "llama-minicpmv-cli": "2.34",
+              "llama-mtmd-cli": "2.34",
+              "llama-mtmd-debug": "2.34",
+              "llama-perplexity": "2.34",
+              "llama-quantize": "2.34",
+              "llama-qwen2vl-cli": "2.34",
+              "llama-results": "2.34",
+              "llama-server": "2.34",
+              "llama-tokenize": "2.34",
+              "llama-tts": "2.34"
+            }
+          }
+        },
+        {
+          "id": "T0.7",
+          "name": "library search path",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 2,
+          "error": null,
+          "details": {
+            "leaked": {}
+          }
+        },
+        {
+          "id": "T0.8",
+          "name": "llama-server flag surface",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 14,
+          "error": null,
+          "details": {
+            "returncode": 0,
+            "help_bytes": 60758,
+            "flags_checked": 12,
+            "flags_missing": []
+          }
+        },
+        {
+          "id": "T0.9",
+          "name": "archive tag consistency",
+          "tier": "tier0",
+          "status": "skip",
+          "gating": false,
+          "duration_ms": 0,
+          "error": "no tag to compare (flat archive layout)",
+          "details": {
+            "asset_tag": null,
+            "inner_dir_tag": "b11960",
+            "top_level": [
+              "llama-b11960"
+            ]
+          }
+        },
+        {
+          "id": "T0.12",
+          "name": "ROCm dependency resolution",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 3,
+          "error": null,
+          "details": {
+            "rocm_dirs_searched": 6,
+            "files_available": 233,
+            "rocm_libraries_required": [
+              "libamdhip64.so.7",
+              "libhipblas.so.3",
+              "librocblas.so.5"
+            ],
+            "unresolved": {}
+          }
+        }
+      ]
+    },
+    "tier1": {
+      "status": "pass",
+      "tier_name": "GPU functional inference",
+      "counts": {
+        "pass": 5,
+        "fail": 0,
+        "warn": 0,
+        "skip": 0,
+        "total": 5
+      },
+      "tests": [
+        {
+          "id": "T1.1",
+          "name": "server boot",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": null,
+          "error": null,
+          "details": {
+            "port": 8231,
+            "args": [
+              "--ctx-size",
+              "4096",
+              "--jinja",
+              "--metrics",
+              "-lv",
+              "4"
+            ]
+          }
+        },
+        {
+          "id": "T1.2",
+          "name": "GPU really did the work",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 3,
+          "error": null,
+          "details": {
+            "gpu_proof": [
+              "using device ROCm0",
+              "ROCm0 model buffer size",
+              "ROCm0 KV buffer size",
+              "ROCm0 compute buffer size"
+            ],
+            "requested_offload_line": "offloaded 29/29 layers to GPU",
+            "devices_reported": [],
+            "props_status": 200,
+            "props_n_gpu_layers": null
+          }
+        },
+        {
+          "id": "T1.3",
+          "name": "response well-formed",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 605,
+          "error": null,
+          "details": {
+            "finish_reason": "stop",
+            "chars": 643,
+            "reasoning_chars": 612,
+            "answer_chars": 31,
+            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase that concisely?\n\nFirst, I need to make sure I'm not missing any other information. The capital is indeed Paris. So the answer is straightforward. I should mention the city and its significance. Maybe start with \"The capital of France is Paris.\" Then",
+            "replacement_chars": 0
+          }
+        },
+        {
+          "id": "T1.4",
+          "name": "greedy determinism",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": false,
+          "duration_ms": 538,
+          "error": null,
+          "details": {
+            "prompt": "What is 2 + 2?",
+            "identical": true,
+            "first": "Okay, so I need to figure out what 2 plus 2 is. Let me think. Well, addition is when you have two numbers and you add them together. So 2 plus 2... that should be 4, right? But wait, maybe I should break it down step by step",
+            "second": "Okay, so I need to figure out what 2 plus 2 is. Let me think. Well, addition is when you have two numbers and you add them together. So 2 plus 2... that should be 4, right? But wait, maybe I should break it down step by step"
+          }
+        },
+        {
+          "id": "T1.5",
+          "name": "reasoning pass completed",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": false,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "reasoning_chars": 612,
+            "answer_chars": 31,
+            "finish_reason": "stop",
+            "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase that concisely?\n\nFirst, I need to make sure I'm n",
+            "answer_sample": "The capital of France is Paris."
+          }
+        }
+      ]
+    }
+  },
+  "promotion": {
+    "blocked_by": []
+  },
+  "gfx": {
+    "requested": [
+      "gfx1010",
+      "gfx1011",
+      "gfx1012",
+      "gfx1030",
+      "gfx1031",
+      "gfx1032",
+      "gfx1033",
+      "gfx1034",
+      "gfx1035",
+      "gfx1036",
+      "gfx1100",
+      "gfx1101",
+      "gfx1102",
+      "gfx1103",
+      "gfx1150",
+      "gfx1151",
+      "gfx1152",
+      "gfx1153",
+      "gfx1200",
+      "gfx1201",
+      "gfx900",
+      "gfx906",
+      "gfx908",
+      "gfx90a",
+      "gfx90c",
+      "gfx942",
+      "gfx950"
+    ],
+    "present_in_binary": [
+      "gfx1010",
+      "gfx1011",
+      "gfx1012",
+      "gfx1030",
+      "gfx1031",
+      "gfx1032",
+      "gfx1033",
+      "gfx1034",
+      "gfx1035",
+      "gfx1036",
+      "gfx1100",
+      "gfx1101",
+      "gfx1102",
+      "gfx1103",
+      "gfx1150",
+      "gfx1151",
+      "gfx1152",
+      "gfx1153",
+      "gfx1200",
+      "gfx1201",
+      "gfx900",
+      "gfx906",
+      "gfx908",
+      "gfx90a",
+      "gfx90c",
+      "gfx942",
+      "gfx950"
+    ],
+    "missing_from_binary": [],
+    "hardware_validated": [
+      "gfx1151"
+    ]
+  }
+}
