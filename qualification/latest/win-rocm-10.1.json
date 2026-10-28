@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-27T12:39:10Z",
+  "generated_at": "2026-10-28T00:47:16Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-10.1-x64.zip@40501231559",
-    "artifact": "llama-b11932-bin-win-rocm-10.1-x64.zip",
+    "build_id": "llama-bin-win-rocm-10.1-x64.zip@40606884904",
+    "artifact": "llama-b11945-bin-win-rocm-10.1-x64.zip",
     "os": "win",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b11932",
-    "upstream_sha": "0c8c59ef3d1b7a5c073f3cd1c2fe28d4fa960c89",
+    "llamacpp_tag": "b11945",
+    "upstream_sha": "d05706b4f32a545814856e98ca518292585443b9",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40501231559",
+    "run_id": "40606884904",
     "run_attempt": "1"
   },
   "overall": "warn",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 102,
             "missing": [],
-            "bytes": 224516367
+            "bytes": 224557141
           }
         },
         {
@@ -114,7 +114,7 @@
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1047282688
+            "bytes": 1047151616
           }
         },
         {
@@ -127,7 +127,7 @@
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1047282688,
+            "bytes_scanned": 1047151616,
             "bundle_magic_count": 141,
             "expected_count": 20,
             "present_count": 20,
@@ -274,7 +274,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 62,
+          "duration_ms": 46,
           "error": null,
           "details": {
             "returncode": 0,
@@ -403,7 +403,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 296,
+          "duration_ms": 328,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -475,7 +475,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 1233,
+          "duration_ms": 780,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -492,7 +492,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 516,
+          "duration_ms": 484,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
