@@ -1,0 +1,541 @@
+{
+  "schema_version": 1,
+  "kind": "qualification_record",
+  "generated_at": "2026-10-29T16:11:22Z",
+  "build": {
+    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40870439417",
+    "artifact": "llama-b11997-bin-win-rocm-7.14-x64.zip",
+    "os": "win",
+    "rocm_version": "7.14",
+    "llamacpp_tag": "b11997",
+    "upstream_sha": "0ac1a7fd35c127a18c0cbc6c57d12e256a6a385b",
+    "gfx_target": "gfx1151",
+    "hardware_validated": true,
+    "run_id": "40870439417",
+    "run_attempt": "1"
+  },
+  "overall": "fail",
+  "promoted": false,
+  "counts": {
+    "pass": 8,
+    "fail": 1,
+    "warn": 1,
+    "skip": 7,
+    "total": 17
+  },
+  "tiers": {
+    "tier0": {
+      "status": "warn",
+      "tier_name": "Static artifact verification",
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "warn": 1,
+        "skip": 3,
+        "total": 12
+      },
+      "tests": [
+        {
+          "id": "T0.10",
+          "name": "Windows CPU-backend merge landed",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "cpu_variants": 14,
+            "names": [
+              "ggml-cpu-alderlake.dll",
+              "ggml-cpu-cannonlake.dll",
+              "ggml-cpu-cascadelake.dll",
+              "ggml-cpu-cooperlake.dll",
+              "ggml-cpu-haswell.dll",
+              "ggml-cpu-icelake.dll",
+              "ggml-cpu-ivybridge.dll",
+              "ggml-cpu-piledriver.dll",
+              "ggml-cpu-sandybridge.dll",
+              "ggml-cpu-sapphirerapids.dll",
+              "ggml-cpu-skylakex.dll",
+              "ggml-cpu-sse42.dll",
+              "ggml-cpu-x64.dll",
+              "ggml-cpu-zen4.dll"
+            ]
+          }
+        },
+        {
+          "id": "T0.11",
+          "name": "final archive integrity",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "entries": 102,
+            "missing": [],
+            "bytes": 217613084
+          }
+        },
+        {
+          "id": "T0.1",
+          "name": "archive contents",
+          "tier": "tier0",
+          "status": "warn",
+          "gating": true,
+          "duration_ms": 0,
+          "error": "28 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
+          "details": {
+            "entries": 99,
+            "missing": [],
+            "test_binaries_shipped": 28,
+            "test_binaries": [
+              "test-alloc.exe",
+              "test-arg-parser.exe",
+              "test-autorelease.exe",
+              "test-backend-ops.exe",
+              "test-backend-sampler.exe",
+              "test-c.exe",
+              "test-chat-analysis.exe",
+              "test-chat-auto-parser.exe",
+              "test-chat-peg-parser.exe",
+              "test-chat-template.exe"
+            ]
+          }
+        },
+        {
+          "id": "T0.2",
+          "name": "HIP backend present",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "backend": "ggml-hip.dll",
+            "exists": true,
+            "bytes": 1026857472
+          }
+        },
+        {
+          "id": "T0.3",
+          "name": "gfx target audit",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 16782,
+          "error": null,
+          "details": {
+            "binary": "ggml-hip.dll",
+            "bytes_scanned": 1026857472,
+            "bundle_magic_count": 141,
+            "expected_count": 20,
+            "present_count": 20,
+            "expected": [
+              "gfx1010",
+              "gfx1011",
+              "gfx1012",
+              "gfx1030",
+              "gfx1031",
+              "gfx1032",
+              "gfx1033",
+              "gfx1034",
+              "gfx1035",
+              "gfx1036",
+              "gfx1100",
+              "gfx1101",
+              "gfx1102",
+              "gfx1103",
+              "gfx1150",
+              "gfx1151",
+              "gfx1152",
+              "gfx1153",
+              "gfx1200",
+              "gfx1201"
+            ],
+            "present": [
+              "gfx1010",
+              "gfx1011",
+              "gfx1012",
+              "gfx1030",
+              "gfx1031",
+              "gfx1032",
+              "gfx1033",
+              "gfx1034",
+              "gfx1035",
+              "gfx1036",
+              "gfx1100",
+              "gfx1101",
+              "gfx1102",
+              "gfx1103",
+              "gfx1150",
+              "gfx1151",
+              "gfx1152",
+              "gfx1153",
+              "gfx1200",
+              "gfx1201"
+            ],
+            "missing": [],
+            "extra": [],
+            "entries_per_target": {
+              "gfx1010": 141,
+              "gfx1011": 141,
+              "gfx1012": 141,
+              "gfx1030": 141,
+              "gfx1031": 141,
+              "gfx1032": 141,
+              "gfx1033": 141,
+              "gfx1034": 141,
+              "gfx1035": 141,
+              "gfx1036": 141,
+              "gfx1100": 141,
+              "gfx1101": 141,
+              "gfx1102": 141,
+              "gfx1103": 141,
+              "gfx1150": 141,
+              "gfx1151": 141,
+              "gfx1152": 141,
+              "gfx1153": 141,
+              "gfx1200": 141,
+              "gfx1201": 141
+            },
+            "entry_count_uniform": true
+          }
+        },
+        {
+          "id": "T0.4",
+          "name": "CPU backend variants",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "count": 14,
+            "variants": [
+              "ggml-cpu-alderlake.dll",
+              "ggml-cpu-cannonlake.dll",
+              "ggml-cpu-cascadelake.dll",
+              "ggml-cpu-cooperlake.dll",
+              "ggml-cpu-haswell.dll",
+              "ggml-cpu-icelake.dll",
+              "ggml-cpu-ivybridge.dll",
+              "ggml-cpu-piledriver.dll",
+              "ggml-cpu-sandybridge.dll",
+              "ggml-cpu-sapphirerapids.dll",
+              "ggml-cpu-skylakex.dll",
+              "ggml-cpu-sse42.dll",
+              "ggml-cpu-x64.dll",
+              "ggml-cpu-zen4.dll"
+            ],
+            "post_merge": false
+          }
+        },
+        {
+          "id": "T0.5",
+          "name": "runtime dependency survey",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 312,
+          "error": null,
+          "details": {
+            "binaries_scanned": 98,
+            "rocm_runtime_required": [
+              "amdhip64_7.dll",
+              "hipblas.dll"
+            ],
+            "unresolved": {}
+          }
+        },
+        {
+          "id": "T0.6",
+          "name": "Linux version support",
+          "tier": "tier0",
+          "status": "skip",
+          "gating": true,
+          "duration_ms": 0,
+          "error": "Linux-only check",
+          "details": {}
+        },
+        {
+          "id": "T0.7",
+          "name": "library search path",
+          "tier": "tier0",
+          "status": "skip",
+          "gating": true,
+          "duration_ms": 0,
+          "error": "Linux-only check",
+          "details": {}
+        },
+        {
+          "id": "T0.8",
+          "name": "llama-server flag surface",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 46,
+          "error": null,
+          "details": {
+            "returncode": 0,
+            "help_bytes": 60758,
+            "flags_checked": 12,
+            "flags_missing": []
+          }
+        },
+        {
+          "id": "T0.9",
+          "name": "archive tag consistency",
+          "tier": "tier0",
+          "status": "skip",
+          "gating": false,
+          "duration_ms": 0,
+          "error": "no tag to compare (flat archive layout)",
+          "details": {
+            "asset_tag": null,
+            "inner_dir_tag": null,
+            "top_level": [
+              "LICENSE",
+              "ggml-base.dll",
+              "ggml-cpu-alderlake.dll",
+              "ggml-cpu-cannonlake.dll",
+              "ggml-cpu-cascadelake.dll",
+              "ggml-cpu-cooperlake.dll",
+              "ggml-cpu-haswell.dll",
+              "ggml-cpu-icelake.dll",
+              "ggml-cpu-ivybridge.dll",
+              "ggml-cpu-piledriver.dll",
+              "ggml-cpu-sandybridge.dll",
+              "ggml-cpu-sapphirerapids.dll",
+              "ggml-cpu-skylakex.dll",
+              "ggml-cpu-sse42.dll",
+              "ggml-cpu-x64.dll",
+              "ggml-cpu-zen4.dll",
+              "ggml-hip.dll",
+              "ggml.dll",
+              "llama-batched-bench-impl.dll",
+              "llama-batched-bench.exe",
+              "llama-batched.exe",
+              "llama-bench-impl.dll",
+              "llama-bench.exe",
+              "llama-cli-impl.dll",
+              "llama-cli.exe",
+              "llama-common.dll",
+              "llama-completion-impl.dll",
+              "llama-completion.exe",
+              "llama-debug.exe",
+              "llama-diffusion-cli.exe",
+              "llama-embedding.exe",
+              "llama-eval-callback.exe",
+              "llama-finetune.exe",
+              "llama-fit-params-impl.dll",
+              "llama-fit-params.exe",
+              "llama-gemma3-cli.exe",
+              "llama-gen-docs.exe",
+              "llama-gguf-hash.exe",
+              "llama-gguf-split.exe",
+              "llama-gguf.exe",
+              "llama-idle.exe",
+              "llama-imatrix.exe",
+              "llama-llava-cli.exe",
+              "llama-lookahead.exe",
+              "llama-lookup-create.exe",
+              "llama-lookup-merge.exe",
+              "llama-lookup-stats.exe",
+              "llama-lookup.exe",
+              "llama-minicpmv-cli.exe",
+              "llama-mtmd-cli.exe",
+              "llama-mtmd-debug.exe",
+              "llama-parallel.exe",
+              "llama-passkey.exe",
+              "llama-perplexity-impl.dll",
+              "llama-perplexity.exe",
+              "llama-quantize-impl.dll",
+              "llama-quantize.exe",
+              "llama-qwen2vl-cli.exe",
+              "llama-results.exe",
+              "llama-retrieval.exe",
+              "llama-server-impl.dll",
+              "llama-server.exe",
+              "llama-simple-chat.exe",
+              "llama-simple.exe",
+              "llama-speculative-simple.exe",
+              "llama-speculative.exe",
+              "llama-tokenize.exe",
+              "llama-tts.exe",
+              "llama.dll",
+              "llama.exe",
+              "mtmd.dll",
+              "test-alloc.exe",
+              "test-arg-parser.exe",
+              "test-autorelease.exe",
+              "test-backend-ops.exe",
+              "test-backend-sampler.exe",
+              "test-c.exe",
+              "test-chat-analysis.exe",
+              "test-chat-auto-parser.exe",
+              "test-chat-peg-parser.exe",
+              "test-chat-template.exe",
+              "test-export-graph-ops.exe",
+              "test-fusion.exe",
+              "test-gguf.exe",
+              "test-jinja.exe",
+              "test-json-schema.exe",
+              "test-llama-archs.exe",
+              "test-llama-context.exe",
+              "test-log.exe",
+              "test-model-load-cancel.exe",
+              "test-model-resolution.exe",
+              "test-mtmd-c-api.exe",
+              "test-mtmd-impl.exe",
+              "test-opt.exe",
+              "test-peg-parser.exe",
+              "test-speculative-rejection-sampling.exe",
+              "test-thread-safety.exe",
+              "test-tiled-mulmat.exe",
+              "test-tokenizer-0.exe"
+            ]
+          }
+        },
+        {
+          "id": "T0.12",
+          "name": "ROCm dependency resolution",
+          "tier": "tier0",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 328,
+          "error": null,
+          "details": {
+            "rocm_dirs_searched": 5,
+            "files_available": 129,
+            "rocm_libraries_required": [
+              "amdhip64_7.dll",
+              "hipblas.dll"
+            ],
+            "unresolved": {}
+          }
+        }
+      ]
+    },
+    "tier1": {
+      "status": "fail",
+      "tier_name": "GPU functional inference",
+      "counts": {
+        "pass": 0,
+        "fail": 1,
+        "warn": 0,
+        "skip": 4,
+        "total": 5
+      },
+      "tests": [
+        {
+          "id": "T1.1",
+          "name": "server boot",
+          "tier": "tier1",
+          "status": "fail",
+          "gating": true,
+          "duration_ms": null,
+          "error": "llama-server exited early (rc=1)",
+          "details": {
+            "log_tail": "0.00.411.313 I srv  llama_server: initializing ...\n0.00.411.337 I cmn  common_param: common_params_print_info: build 11997 (0ac1a7fd3) with Clang 23.0.0 for Windows AMD64\n0.00.411.338 I cmn  common_param: common_params_print_info: verbosity = 4 (adjust with the `-lv N` CLI arg)\n0.00.411.343 I cmn  common_param: device_info:\n0.00.541.391 I cmn  common_param:   - ROCm0   : AMD Radeon(TM) 8060S Graphics (102129 MiB, 101974 MiB free)\n0.00.541.404 I cmn  common_param:   - CPU     : AMD RYZEN AI MAX+ 395 w/ Radeon 8060S           (65174 MiB, 56745 MiB free)\n0.00.541.508 I cmn  common_param: system_info: n_threads = 16 (n_threads_batch = 16) / 32 | ROCm : NO_VMM = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | REPACK = 1 | \n0.00.541.515 I srv  server_prepa: n_parallel is set to auto, using n_parallel = 4 and kv_unified = true\n0.00.541.907 I srv          init: using 31 threads for HTTP server\n0.00.541.998 W srv  server_setup: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)\n0.00.558.272 I srv    load_model: loading model 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.558.281 I srv    load_model: local path 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.558.347 I cmn  common_fit_a: fitting params to device memory ...\n0.00.558.348 I cmn  common_fit_a: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)\n0.00.558.433 I common_params_fit_impl: getting device memory data for initial parameters:\n0.00.606.436 E llama_model_load: error loading model: tensor 'blk.24.ffn_gate.weight' data is not within the file bounds, model is corrupted or incomplete\n0.00.606.445 E llama_model_load_from_file_impl: failed to load model\n0.00.606.502 E common_fit_params: encountered an error while trying to fit params to free device memory: failed to load model\n0.00.606.512 I common_fit_params: fitting params to free memory took 0.05 seconds\n0.00.631.361 E llama_model_load: error loading model: tensor 'blk.24.ffn_gate.weight' data is not within the file bounds, model is corrupted or incomplete\n0.00.631.365 E llama_model_load_from_file_impl: failed to load model\n0.00.631.374 E cmn  common_init_: failed to load model 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.631.377 E srv    load_model: failed to load model, 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.631.395 I srv    operator(): operator(): cleaning up before exit...\n0.00.632.909 E srv  server_run_i: exiting due to model loading error\n"
+          }
+        },
+        {
+          "id": "T1.2",
+          "name": "GPU really did the work",
+          "tier": "tier1",
+          "status": "skip",
+          "gating": true,
+          "duration_ms": null,
+          "error": "server not ready",
+          "details": {}
+        },
+        {
+          "id": "T1.3",
+          "name": "response well-formed",
+          "tier": "tier1",
+          "status": "skip",
+          "gating": true,
+          "duration_ms": null,
+          "error": "server not ready",
+          "details": {}
+        },
+        {
+          "id": "T1.4",
+          "name": "greedy determinism",
+          "tier": "tier1",
+          "status": "skip",
+          "gating": false,
+          "duration_ms": null,
+          "error": "server not ready",
+          "details": {}
+        },
+        {
+          "id": "T1.5",
+          "name": "reasoning pass completed",
+          "tier": "tier1",
+          "status": "skip",
+          "gating": false,
+          "duration_ms": null,
+          "error": "server not ready",
+          "details": {}
+        }
+      ]
+    }
+  },
+  "promotion": {
+    "blocked_by": [
+      "tier1=fail"
+    ]
+  },
+  "gfx": {
+    "requested": [
+      "gfx1010",
+      "gfx1011",
+      "gfx1012",
+      "gfx1030",
+      "gfx1031",
+      "gfx1032",
+      "gfx1033",
+      "gfx1034",
+      "gfx1035",
+      "gfx1036",
+      "gfx1100",
+      "gfx1101",
+      "gfx1102",
+      "gfx1103",
+      "gfx1150",
+      "gfx1151",
+      "gfx1152",
+      "gfx1153",
+      "gfx1200",
+      "gfx1201"
+    ],
+    "present_in_binary": [
+      "gfx1010",
+      "gfx1011",
+      "gfx1012",
+      "gfx1030",
+      "gfx1031",
+      "gfx1032",
+      "gfx1033",
+      "gfx1034",
+      "gfx1035",
+      "gfx1036",
+      "gfx1100",
+      "gfx1101",
+      "gfx1102",
+      "gfx1103",
+      "gfx1150",
+      "gfx1151",
+      "gfx1152",
+      "gfx1153",
+      "gfx1200",
+      "gfx1201"
+    ],
+    "missing_from_binary": [],
+    "hardware_validated": [
+      "gfx1151"
+    ]
+  }
+}
