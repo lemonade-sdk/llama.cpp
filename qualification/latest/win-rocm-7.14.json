@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-29T16:11:22Z",
+  "generated_at": "2026-10-30T03:47:31Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40870439417",
-    "artifact": "llama-b11997-bin-win-rocm-7.14-x64.zip",
+    "build_id": "llama-bin-win-rocm-7.14-x64.zip@40977810710",
+    "artifact": "llama-b12003-bin-win-rocm-7.14-x64.zip",
     "os": "win",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b11997",
-    "upstream_sha": "0ac1a7fd35c127a18c0cbc6c57d12e256a6a385b",
+    "llamacpp_tag": "b12003",
+    "upstream_sha": "36a0e2ffc0b352b774f8d71c43668b75b3061ef5",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40870439417",
+    "run_id": "40977810710",
     "run_attempt": "1"
   },
-  "overall": "fail",
-  "promoted": false,
+  "overall": "warn",
+  "promoted": true,
   "counts": {
-    "pass": 8,
-    "fail": 1,
+    "pass": 13,
+    "fail": 0,
     "warn": 1,
-    "skip": 7,
+    "skip": 3,
     "total": 17
   },
   "tiers": {
@@ -72,9 +72,9 @@
           "duration_ms": 0,
           "error": null,
           "details": {
-            "entries": 102,
+            "entries": 103,
             "missing": [],
-            "bytes": 217613084
+            "bytes": 217774664
           }
         },
         {
@@ -84,22 +84,22 @@
           "status": "warn",
           "gating": true,
           "duration_ms": 0,
-          "error": "28 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
+          "error": "29 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
           "details": {
-            "entries": 99,
+            "entries": 100,
             "missing": [],
-            "test_binaries_shipped": 28,
+            "test_binaries_shipped": 29,
             "test_binaries": [
               "test-alloc.exe",
               "test-arg-parser.exe",
               "test-autorelease.exe",
               "test-backend-ops.exe",
               "test-backend-sampler.exe",
+              "test-backend-tensor.exe",
               "test-c.exe",
               "test-chat-analysis.exe",
               "test-chat-auto-parser.exe",
-              "test-chat-peg-parser.exe",
-              "test-chat-template.exe"
+              "test-chat-peg-parser.exe"
             ]
           }
         },
@@ -114,7 +114,7 @@
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1026857472
+            "bytes": 1026860032
           }
         },
         {
@@ -123,11 +123,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 16782,
+          "duration_ms": 16828,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1026857472,
+            "bytes_scanned": 1026860032,
             "bundle_magic_count": 141,
             "expected_count": 20,
             "present_count": 20,
@@ -237,10 +237,10 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 312,
+          "duration_ms": 296,
           "error": null,
           "details": {
-            "binaries_scanned": 98,
+            "binaries_scanned": 99,
             "rocm_runtime_required": [
               "amdhip64_7.dll",
               "hipblas.dll"
@@ -274,7 +274,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 46,
+          "duration_ms": 45,
           "error": null,
           "details": {
             "returncode": 0,
@@ -371,6 +371,7 @@
               "test-autorelease.exe",
               "test-backend-ops.exe",
               "test-backend-sampler.exe",
+              "test-backend-tensor.exe",
               "test-c.exe",
               "test-chat-analysis.exe",
               "test-chat-auto-parser.exe",
@@ -403,7 +404,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 328,
+          "duration_ms": 329,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -418,13 +419,13 @@
       ]
     },
     "tier1": {
-      "status": "fail",
+      "status": "pass",
       "tier_name": "GPU functional inference",
       "counts": {
-        "pass": 0,
-        "fail": 1,
+        "pass": 5,
+        "fail": 0,
         "warn": 0,
-        "skip": 4,
+        "skip": 0,
         "total": 5
       },
       "tests": [
@@ -432,61 +433,96 @@
           "id": "T1.1",
           "name": "server boot",
           "tier": "tier1",
-          "status": "fail",
+          "status": "pass",
           "gating": true,
           "duration_ms": null,
-          "error": "llama-server exited early (rc=1)",
+          "error": null,
           "details": {
-            "log_tail": "0.00.411.313 I srv  llama_server: initializing ...\n0.00.411.337 I cmn  common_param: common_params_print_info: build 11997 (0ac1a7fd3) with Clang 23.0.0 for Windows AMD64\n0.00.411.338 I cmn  common_param: common_params_print_info: verbosity = 4 (adjust with the `-lv N` CLI arg)\n0.00.411.343 I cmn  common_param: device_info:\n0.00.541.391 I cmn  common_param:   - ROCm0   : AMD Radeon(TM) 8060S Graphics (102129 MiB, 101974 MiB free)\n0.00.541.404 I cmn  common_param:   - CPU     : AMD RYZEN AI MAX+ 395 w/ Radeon 8060S           (65174 MiB, 56745 MiB free)\n0.00.541.508 I cmn  common_param: system_info: n_threads = 16 (n_threads_batch = 16) / 32 | ROCm : NO_VMM = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | REPACK = 1 | \n0.00.541.515 I srv  server_prepa: n_parallel is set to auto, using n_parallel = 4 and kv_unified = true\n0.00.541.907 I srv          init: using 31 threads for HTTP server\n0.00.541.998 W srv  server_setup: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)\n0.00.558.272 I srv    load_model: loading model 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.558.281 I srv    load_model: local path 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.558.347 I cmn  common_fit_a: fitting params to device memory ...\n0.00.558.348 I cmn  common_fit_a: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)\n0.00.558.433 I common_params_fit_impl: getting device memory data for initial parameters:\n0.00.606.436 E llama_model_load: error loading model: tensor 'blk.24.ffn_gate.weight' data is not within the file bounds, model is corrupted or incomplete\n0.00.606.445 E llama_model_load_from_file_impl: failed to load model\n0.00.606.502 E common_fit_params: encountered an error while trying to fit params to free device memory: failed to load model\n0.00.606.512 I common_fit_params: fitting params to free memory took 0.05 seconds\n0.00.631.361 E llama_model_load: error loading model: tensor 'blk.24.ffn_gate.weight' data is not within the file bounds, model is corrupted or incomplete\n0.00.631.365 E llama_model_load_from_file_impl: failed to load model\n0.00.631.374 E cmn  common_init_: failed to load model 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.631.377 E srv    load_model: failed to load model, 'C:\\actions-runner\\_work\\_temp\\tier1-xgycfp4t\\Qwen3-0.6B-Q4_0.gguf'\n0.00.631.395 I srv    operator(): operator(): cleaning up before exit...\n0.00.632.909 E srv  server_run_i: exiting due to model loading error\n"
+            "port": 8231,
+            "args": [
+              "--ctx-size",
+              "4096",
+              "--jinja",
+              "--metrics",
+              "-lv",
+              "4"
+            ]
           }
         },
         {
           "id": "T1.2",
           "name": "GPU really did the work",
           "tier": "tier1",
-          "status": "skip",
+          "status": "pass",
           "gating": true,
-          "duration_ms": null,
-          "error": "server not ready",
-          "details": {}
+          "duration_ms": 31,
+          "error": null,
+          "details": {
+            "gpu_proof": [
+              "using device ROCm0",
+              "ROCm0 model buffer size",
+              "ROCm0 KV buffer size",
+              "ROCm0 compute buffer size"
+            ],
+            "requested_offload_line": "offloaded 29/29 layers to GPU",
+            "devices_reported": [],
+            "props_status": 200,
+            "props_n_gpu_layers": null
+          }
         },
         {
           "id": "T1.3",
           "name": "response well-formed",
           "tier": "tier1",
-          "status": "skip",
+          "status": "pass",
           "gating": true,
-          "duration_ms": null,
-          "error": "server not ready",
-          "details": {}
+          "duration_ms": 750,
+          "error": null,
+          "details": {
+            "finish_reason": "stop",
+            "chars": 643,
+            "reasoning_chars": 612,
+            "answer_chars": 31,
+            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase that concisely?\n\nFirst, I need to make sure I'm not missing any other information. The capital is indeed Paris. So the answer is straightforward. I should mention the city and its significance. Maybe start with \"The capital of France is Paris.\" Then",
+            "replacement_chars": 0
+          }
         },
         {
           "id": "T1.4",
           "name": "greedy determinism",
           "tier": "tier1",
-          "status": "skip",
+          "status": "pass",
           "gating": false,
-          "duration_ms": null,
-          "error": "server not ready",
-          "details": {}
+          "duration_ms": 530,
+          "error": null,
+          "details": {
+            "prompt": "What is 2 + 2?",
+            "identical": true,
+            "first": "Okay, so I need to figure out what 2 plus 2 is. Let me think. Well, addition is when you have two numbers and you add them together. So 2 plus 2... that should be 4, right? But wait, maybe I should break it down step by step",
+            "second": "Okay, so I need to figure out what 2 plus 2 is. Let me think. Well, addition is when you have two numbers and you add them together. So 2 plus 2... that should be 4, right? But wait, maybe I should break it down step by step"
+          }
         },
         {
           "id": "T1.5",
           "name": "reasoning pass completed",
           "tier": "tier1",
-          "status": "skip",
+          "status": "pass",
           "gating": false,
-          "duration_ms": null,
-          "error": "server not ready",
-          "details": {}
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "reasoning_chars": 612,
+            "answer_chars": 31,
+            "finish_reason": "stop",
+            "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase that concisely?\n\nFirst, I need to make sure I'm n",
+            "answer_sample": "The capital of France is Paris."
+          }
         }
       ]
     }
   },
   "promotion": {
-    "blocked_by": [
-      "tier1=fail"
-    ]
+    "blocked_by": []
   },
   "gfx": {
     "requested": [

@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-10-29T16:11:22Z",
+  "generated_at": "2026-10-30T03:47:31Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-10.1-x64.zip@40870439417",
-    "artifact": "llama-b11997-bin-win-rocm-10.1-x64.zip",
+    "build_id": "llama-bin-win-rocm-10.1-x64.zip@40977810710",
+    "artifact": "llama-b12003-bin-win-rocm-10.1-x64.zip",
     "os": "win",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b11997",
-    "upstream_sha": "0ac1a7fd35c127a18c0cbc6c57d12e256a6a385b",
+    "llamacpp_tag": "b12003",
+    "upstream_sha": "36a0e2ffc0b352b774f8d71c43668b75b3061ef5",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "40870439417",
+    "run_id": "40977810710",
     "run_attempt": "1"
   },
   "overall": "warn",
@@ -72,9 +72,9 @@
           "duration_ms": 0,
           "error": null,
           "details": {
-            "entries": 102,
+            "entries": 103,
             "missing": [],
-            "bytes": 225735404
+            "bytes": 225899860
           }
         },
         {
@@ -84,22 +84,22 @@
           "status": "warn",
           "gating": true,
           "duration_ms": 0,
-          "error": "28 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
+          "error": "29 upstream test binary/binaries shipped to users (this job does not pass -DLLAMA_BUILD_TESTS=OFF)",
           "details": {
-            "entries": 99,
+            "entries": 100,
             "missing": [],
-            "test_binaries_shipped": 28,
+            "test_binaries_shipped": 29,
             "test_binaries": [
               "test-alloc.exe",
               "test-arg-parser.exe",
               "test-autorelease.exe",
               "test-backend-ops.exe",
               "test-backend-sampler.exe",
+              "test-backend-tensor.exe",
               "test-c.exe",
               "test-chat-analysis.exe",
               "test-chat-auto-parser.exe",
-              "test-chat-peg-parser.exe",
-              "test-chat-template.exe"
+              "test-chat-peg-parser.exe"
             ]
           }
         },
@@ -114,7 +114,7 @@
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1050441728
+            "bytes": 1050444288
           }
         },
         {
@@ -123,11 +123,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 18000,
+          "duration_ms": 9795,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1050441728,
+            "bytes_scanned": 1050444288,
             "bundle_magic_count": 141,
             "expected_count": 20,
             "present_count": 20,
@@ -237,10 +237,10 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 531,
+          "duration_ms": 296,
           "error": null,
           "details": {
-            "binaries_scanned": 98,
+            "binaries_scanned": 99,
             "rocm_runtime_required": [
               "amdhip64_7.dll",
               "hipblas.dll"
@@ -274,7 +274,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 45,
+          "duration_ms": 46,
           "error": null,
           "details": {
             "returncode": 0,
@@ -371,6 +371,7 @@
               "test-autorelease.exe",
               "test-backend-ops.exe",
               "test-backend-sampler.exe",
+              "test-backend-tensor.exe",
               "test-c.exe",
               "test-chat-analysis.exe",
               "test-chat-auto-parser.exe",
@@ -403,7 +404,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 547,
+          "duration_ms": 328,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -454,7 +455,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 15,
+          "duration_ms": 31,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -475,7 +476,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 750,
+          "duration_ms": 1155,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -492,7 +493,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 500,
+          "duration_ms": 905,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
