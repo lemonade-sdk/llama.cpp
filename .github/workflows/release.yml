@@ -923,9 +923,20 @@ jobs:
 
       - name: Build
         run: |
+          # TheRock's clang targets the MSVC ABI, so link in the VS developer environment it expects:
+          # upstream embeds an app manifest in every exe (ggml-org/llama.cpp#31329), and lld-link needs the SDK's mt.exe to merge it.
+          # The dev shell prepends VS's bundled CMake; keep building with the runner's.
+          $cmake = (Get-Command cmake).Source
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "No Visual Studio install with the x64 C++ tools found" }
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments "-arch=x64 -host_arch=x64"
+          write-host "VS: $vs; cmake: $cmake; mt: $((Get-Command mt.exe).Source)"
+
           mkdir build
           cd build
-          cmake .. `
+          & $cmake .. `
             -G "Unix Makefiles" `
             -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
             -DCMAKE_BUILD_TYPE=Release `
@@ -941,7 +952,7 @@ jobs:
             -DHIP_PATH="${env:HIP_PATH}" `
             -DGGML_HIP_ROCWMMA_FATTN=ON `
             -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}"
-          cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
+          & $cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
 
       - name: Verify HIP backend was built
         run: |
