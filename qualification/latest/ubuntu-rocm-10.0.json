@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-02T00:29:43Z",
+  "generated_at": "2026-11-02T12:37:36Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@41365547808",
-    "artifact": "llama-b12033-bin-ubuntu-rocm-10.0-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@41441760525",
+    "artifact": "llama-b12052-bin-ubuntu-rocm-10.0-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.0",
-    "llamacpp_tag": "b12033",
-    "upstream_sha": "785322d17f2d51e5185cf996a1f4e46d87640841",
+    "llamacpp_tag": "b12052",
+    "upstream_sha": "84d9ce0faddad002cd26a5a3fcd29f71fb426a1f",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "41365547808",
+    "run_id": "41441760525",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -70,7 +70,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 23295,
+          "duration_ms": 23469,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
@@ -290,7 +290,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "leaked": {}
@@ -302,7 +302,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 19,
+          "duration_ms": 20,
           "error": null,
           "details": {
             "returncode": 0,
@@ -321,9 +321,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b12033",
+            "inner_dir_tag": "b12052",
             "top_level": [
-              "llama-b12033"
+              "llama-b12052"
             ]
           }
         },
@@ -385,7 +385,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 1,
+          "duration_ms": 2,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -406,7 +406,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 596,
+          "duration_ms": 772,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -423,7 +423,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 501,
+          "duration_ms": 663,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
