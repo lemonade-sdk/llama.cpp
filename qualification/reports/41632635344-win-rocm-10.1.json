@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "kind": "qualification_placeholder",
+  "generated_at": "2026-11-03T15:31:33Z",
+  "build": {
+    "build_id": "llama-b12086-bin-win-rocm-10.1-x64.zip@41632635344",
+    "artifact": "llama-b12086-bin-win-rocm-10.1-x64.zip",
+    "os": "win",
+    "rocm_version": "10.1",
+    "llamacpp_tag": "b12086",
+    "upstream_sha": "749db7f034d43d6de01a01f6d8c872d02afa6c7b",
+    "gfx_target": null,
+    "hardware_validated": false,
+    "run_id": "41632635344",
+    "run_attempt": "1"
+  },
+  "overall": "fail",
+  "promoted": false,
+  "counts": {
+    "pass": 0,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "total": 0
+  },
+  "tiers": {},
+  "promotion": {
+    "blocked_by": [
+      "build cancelled"
+    ]
+  },
+  "build_result": "cancelled",
+  "gfx": {
+    "requested": [],
+    "present_in_binary": [],
+    "missing_from_binary": [],
+    "hardware_validated": []
+  }
+}

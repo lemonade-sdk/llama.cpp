@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-03T03:40:49Z",
+  "generated_at": "2026-11-03T15:31:33Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@41550569320",
-    "artifact": "llama-b12062-bin-ubuntu-rocm-10.0-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@41632635344",
+    "artifact": "llama-b12086-bin-ubuntu-rocm-10.0-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.0",
-    "llamacpp_tag": "b12062",
-    "upstream_sha": "29c720eaf72fcf8e4e61a56a88b994d92668261d",
+    "llamacpp_tag": "b12086",
+    "upstream_sha": "749db7f034d43d6de01a01f6d8c872d02afa6c7b",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "41550569320",
+    "run_id": "41632635344",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1402834056
+            "bytes": 1402850944
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 23508,
+          "duration_ms": 12952,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1402834056,
+            "bytes_scanned": 1402850944,
             "bundle_magic_count": 141,
             "expected_count": 27,
             "present_count": 27,
@@ -205,7 +205,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 6,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -223,7 +223,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 5,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -290,7 +290,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 2,
           "error": null,
           "details": {
             "leaked": {}
@@ -302,7 +302,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 20,
+          "duration_ms": 13,
           "error": null,
           "details": {
             "returncode": 0,
@@ -321,9 +321,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b12062",
+            "inner_dir_tag": "b12086",
             "top_level": [
-              "llama-b12062"
+              "llama-b12086"
             ]
           }
         },
@@ -333,7 +333,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 5,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -406,14 +406,14 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 789,
+          "duration_ms": 613,
           "error": null,
           "details": {
             "finish_reason": "stop",
-            "chars": 643,
-            "reasoning_chars": 612,
+            "chars": 656,
+            "reasoning_chars": 625,
             "answer_chars": 31,
-            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase that concisely?\n\nFirst, I need to make sure I'm not missing any other information. The capital is indeed Paris. So the answer is straightforward. I should mention the city and its significance. Maybe start with \"The capital of France is Paris.\" Then",
+            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm not missing any other information. The capital is indeed Paris. So the answer is straightforward. I should mention the city and its significance. Maybe start with \"The capital of France is Paris.\" Then",
             "replacement_chars": 0
           }
         },
@@ -423,13 +423,13 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 682,
+          "duration_ms": 492,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
             "identical": true,
-            "first": "Okay, so I need to figure out what 2 plus 2 is. Let me think. Well, addition is when you have two numbers and you add them together. So 2 plus 2... that should be 4, right? But wait, maybe I should break it down step by step",
-            "second": "Okay, so I need to figure out what 2 plus 2 is. Let me think. Well, addition is when you have two numbers and you add them together. So 2 plus 2... that should be 4, right? But wait, maybe I should break it down step by step"
+            "first": "Okay, so the user is asking, \"What is 2 + 2?\" Let me think about how to approach this. Well, this is a simple arithmetic problem. The question is straightforward: adding 2 and 2 together. \n\nFirst, I need to confirm if there's any trick or hidden",
+            "second": "Okay, so the user is asking, \"What is 2 + 2?\" Let me think about how to approach this. Well, this is a simple arithmetic problem. The question is straightforward: adding 2 and 2 together. \n\nFirst, I need to confirm if there's any trick or hidden"
           }
         },
         {
@@ -441,10 +441,10 @@
           "duration_ms": 0,
           "error": null,
           "details": {
-            "reasoning_chars": 612,
+            "reasoning_chars": 625,
             "answer_chars": 31,
             "finish_reason": "stop",
-            "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase that concisely?\n\nFirst, I need to make sure I'm n",
+            "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm n",
             "answer_sample": "The capital of France is Paris."
           }
         }
