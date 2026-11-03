@@ -221,8 +221,10 @@ the CI logs have expired.
 
 The release job's records are also published, pass or fail, to the
 `qualification-data` branch by `publish_qualification.py`, so a dashboard can
-follow the history of every run without reading each release. The layout and
-every field are described in [FEED.md](FEED.md).
+follow the history of every run without reading each release. An archive whose
+build failed gets a placeholder row, so a missing archive shows up as a failure
+rather than a gap. The layout and every field are described in
+[FEED.md](FEED.md).
 
 ## Out of scope
 

@@ -11,12 +11,19 @@ Versions are judged independently of each other: they are separate products and
 a consumer installs exactly one of them, so a problem in one is no reason to
 withhold another.
 
+With --operating-systems and --rocm-versions, an archive that should exist but
+has no report at all (usually because its build failed) also blocks its version:
+the version cannot ship without it, so its other archive must not be reported
+as publishable either.
+
 Within one archive:
   - the static checks must be present and must pass.
   - the GPU checks must pass IF they ran. An archive with no GPU report is
     recorded as not hardware-validated rather than being failed -- each build
     covers 20 or more gfx targets and only one of them has test hardware, so
     the record states which is which instead of implying they are all equal.
+An archive that is not promoted always has overall "fail", even when the reason
+is a tier that never reported rather than a failed check.
 
 With --fail-on-no-promote the exit code is non-zero if any version failed. The
 release job uses that to drop only the affected ROCm versions, leaving every
@@ -25,6 +32,7 @@ other backend untouched.
 Usage:
     python3 aggregate.py --fragments-dir ./fragments --tag bNNNNN \
         --records-dir ./qualification --output-summary summary.json \
+        --operating-systems ubuntu,win --rocm-versions 7.14,10.0,10.1 \
         --fail-on-no-promote
 """
 
@@ -51,6 +59,11 @@ def load_fragments(fragments_dir):
         if data.get("kind") == "tier_fragment":
             fragments.append(data)
     return fragments
+
+
+def split_list(text):
+    """Split a comma or whitespace separated list into clean names."""
+    return [name for part in (text or "").split(",") for name in part.split() if name]
 
 
 def group_key(fragment):
@@ -109,7 +122,7 @@ def gfx_summary(record):
     }
 
 
-def write_step_summary(records, promote_all):
+def write_step_summary(records, promote_all, missing=()):
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not path:
         return
@@ -128,6 +141,8 @@ def write_step_summary(records, promote_all):
             f"| `{build.get('artifact')}` | {t0} | {t1} | "
             f"{len(gfx['present_in_binary'])}/{len(gfx['requested'])} | {hw} | "
             f"{'yes' if record['promoted'] else 'NO'} |")
+    for os_name, rocm_version in missing:
+        lines.append(f"| {os_name} ROCm {rocm_version} | no report | | | | NO |")
 
     problems = []
     for record in records:
@@ -154,16 +169,28 @@ def main():
                         help="write one qualification-<artifact>.json per archive here")
     parser.add_argument("--output-summary", default=None,
                         help="write the combined decision here")
+    parser.add_argument("--operating-systems", default=None,
+                        help="the operating systems every ROCm version is built for, e.g. ubuntu,win")
+    parser.add_argument("--rocm-versions", default=None,
+                        help="the ROCm versions this run builds, e.g. 7.14,10.0,10.1")
     parser.add_argument("--fail-on-no-promote", action="store_true")
     args = parser.parse_args()
+
+    # Every archive the run should have produced. Without the lists, only the archives that reported can be judged.
+    expected = []
+    if args.operating_systems and args.rocm_versions:
+        expected = [(o, v) for v in split_list(args.rocm_versions)
+                    for o in split_list(args.operating_systems)]
 
     fragments = load_fragments(args.fragments_dir)
     if not fragments:
         print(f"::error::No tier fragments found in {args.fragments_dir}. The "
               "qualification jobs produced nothing, so nothing can be vouched for.")
-        if args.fail_on_no_promote:
-            sys.exit(1)
-        return
+        # With no expected list there is no verdict to write, and the release job then withholds every ROCm version.
+        if not expected:
+            if args.fail_on_no_promote:
+                sys.exit(1)
+            return
 
     grouped = {}
     for fragment in fragments:
@@ -178,6 +205,9 @@ def main():
         promote, reasons = decide(record)
         record["promoted"] = promote
         record["promotion"] = {"blocked_by": reasons}
+        # A tier that never reported fails no test, so the test rollup alone could still say "pass".
+        if not promote:
+            record["overall"] = report.STATUS_FAIL
         record["gfx"] = gfx_summary(record)
         records.append(record)
 
@@ -207,18 +237,26 @@ def main():
     for record in records:
         version = record["build"].get("rocm_version") or "?"
         by_version.setdefault(version, []).append(record)
-    blocked = sorted(v for v, group in by_version.items()
-                     if not all(r["promoted"] for r in group))
-    promote_all = not blocked
+    blocked = {v for v, group in by_version.items()
+               if not all(r["promoted"] for r in group)}
+    # An archive with no report at all cannot ship, so neither can its version.
+    missing = [(o, v) for o, v in expected if (o, v) not in grouped]
+    for os_name, rocm_version in missing:
+        print(f"::error::No qualification report at all for {os_name} ROCm {rocm_version}.")
+        blocked.add(rocm_version)
+    blocked = sorted(blocked)
+    promote_all = bool(records) and not blocked
 
-    write_step_summary(records, promote_all)
+    write_step_summary(records, promote_all, missing)
 
     if args.output_summary:
+        os.makedirs(os.path.dirname(os.path.abspath(args.output_summary)), exist_ok=True)
         with open(args.output_summary, "w", encoding="utf-8") as handle:
             json.dump({
                 "tag": args.tag,
                 "all_versions_publishable": promote_all,
                 "blocked_rocm_versions": blocked,
+                "missing_archives": [f"{o}-rocm-{v}" for o, v in missing],
                 "artifacts": [{"artifact": r["build"].get("artifact"),
                                "rocm_version": r["build"].get("rocm_version"),
                                "publishable": r["promoted"],
