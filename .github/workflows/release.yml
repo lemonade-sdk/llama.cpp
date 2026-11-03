@@ -59,6 +59,8 @@ jobs:
     runs-on: ubuntu-24.04
 
     strategy:
+      # Each ROCm version is an independent product, so one version failing must not cancel the others and hide their real result.
+      fail-fast: false
       matrix:
         include:
           - ROCM_VERSION: "7.14.0"
@@ -820,6 +822,8 @@ jobs:
     runs-on: windows-2022
 
     strategy:
+      # Same as ubuntu-24-rocm: one ROCm version failing must not cancel the others.
+      fail-fast: false
       matrix:
         include:
           - ROCM_VERSION: "7.14.0"
@@ -920,6 +924,18 @@ jobs:
 
           # Keep venv in PATH for subsequent steps
           echo "C:\TheRock\build\.venv\Scripts" >> $env:GITHUB_PATH
+
+      # Upstream embeds an application manifest in every .exe (ggml-org/llama.cpp#31329).
+      - name: Put the Windows SDK manifest tool on PATH
+        run: |
+          $ErrorActionPreference = "Stop"
+          $kits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+          $mt = Get-ChildItem -Path (Join-Path $kits "10.*\x64\mt.exe") -ErrorAction SilentlyContinue |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if (-not $mt) { throw "mt.exe not found under $kits; the Windows SDK is missing from this runner" }
+          write-host "Using $($mt.FullName)"
+          echo "$($mt.DirectoryName)" >> $env:GITHUB_PATH
 
       - name: Build
         run: |
