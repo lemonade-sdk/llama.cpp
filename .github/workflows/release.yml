@@ -925,20 +925,23 @@ jobs:
           # Keep venv in PATH for subsequent steps
           echo "C:\TheRock\build\.venv\Scripts" >> $env:GITHUB_PATH
 
-      # Upstream embeds an application manifest in every .exe (ggml-org/llama.cpp#31329).
-      - name: Put the Windows SDK manifest tool on PATH
-        run: |
-          $ErrorActionPreference = "Stop"
-          $kits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
-          $mt = Get-ChildItem -Path (Join-Path $kits "10.*\x64\mt.exe") -ErrorAction SilentlyContinue |
-            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
-            Select-Object -First 1
-          if (-not $mt) { throw "mt.exe not found under $kits; the Windows SDK is missing from this runner" }
-          write-host "Using $($mt.FullName)"
-          echo "$($mt.DirectoryName)" >> $env:GITHUB_PATH
-
       - name: Build
         run: |
+          # Upstream embeds an application manifest in every .exe (ggml-org/llama.cpp#31329).
+          # ROCm's lld-link hands that to mt.exe from the Windows SDK, which is not on PATH outside a VS developer shell.
+          # mt.exe can't be copied out on its own (it fails to start without its SDK siblings), so append its whole folder for this step only.
+          # Appending keeps it from shadowing anything already on PATH.
+          $mt = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Directory.Parent.Name -match '^\d+(\.\d+){1,3}$' } |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if (-not $mt) { throw "mt.exe not found in the Windows SDK; lld-link needs it to embed app manifests" }
+          write-host "Using $($mt.FullName)"
+          $env:PATH = "$env:PATH;$($mt.DirectoryName)"
+          # A negative exit code is an NTSTATUS from the loader (e.g. a missing DLL), not mt.exe's own usage error.
+          mt.exe /? | Out-Null
+          if ($LASTEXITCODE -lt 0) { throw ("mt.exe could not start (0x{0:X8})" -f $LASTEXITCODE) }
+
           mkdir build
           cd build
           cmake .. `
