@@ -64,6 +64,8 @@ jobs:
     runs-on: ubuntu-24.04
 
     strategy:
+      # Each ROCm version is an independent product, so one version failing must not cancel the others and hide their real result.
+      fail-fast: false
       matrix:
         include:
           - ROCM_VERSION: "7.14.0"
@@ -825,6 +827,8 @@ jobs:
     runs-on: windows-2022
 
     strategy:
+      # Same as ubuntu-24-rocm: one ROCm version failing must not cancel the others.
+      fail-fast: false
       matrix:
         include:
           - ROCM_VERSION: "7.14.0"
@@ -928,6 +932,21 @@ jobs:
 
       - name: Build
         run: |
+          # Upstream embeds an application manifest in every .exe (ggml-org/llama.cpp#31329).
+          # ROCm's lld-link hands that to mt.exe from the Windows SDK, which is not on PATH outside a VS developer shell.
+          # mt.exe can't be copied out on its own (it fails to start without its SDK siblings), so append its whole folder for this step only.
+          # Appending keeps it from shadowing anything already on PATH.
+          $mt = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Directory.Parent.Name -match '^\d+(\.\d+){1,3}$' } |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if (-not $mt) { throw "mt.exe not found in the Windows SDK; lld-link needs it to embed app manifests" }
+          write-host "Using $($mt.FullName)"
+          $env:PATH = "$env:PATH;$($mt.DirectoryName)"
+          # A negative exit code is an NTSTATUS from the loader (e.g. a missing DLL), not mt.exe's own usage error.
+          mt.exe /? | Out-Null
+          if ($LASTEXITCODE -lt 0) { throw ("mt.exe could not start (0x{0:X8})" -f $LASTEXITCODE) }
+
           mkdir build
           cd build
           cmake .. `
