@@ -24,6 +24,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # The ROCm archives every run should produce: each version, for each operating system.
+  # The qualification records and the feed use these to notice an archive that never got built.
+  # Keep in step with the ubuntu-24-rocm / windows-rocm matrices and the "Check release artifacts" step.
+  ROCM_VERSIONS: "7.14,10.0,10.1"
+  ROCM_OPERATING_SYSTEMS: "ubuntu,win"
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
   CMAKE_ARGS: "-DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON"
 
@@ -149,6 +154,8 @@ jobs:
     runs-on: ubuntu-24.04
 
     strategy:
+      # Each ROCm version is an independent product, so one version failing must not cancel the others and hide their real result.
+      fail-fast: false
       matrix:
         include:
           - ROCM_VERSION: "7.14.0"
@@ -192,6 +199,9 @@ jobs:
           # builds hit.
           ccache --set-config=compiler_check=content
           ccache --set-config=sloppiness=time_macros,include_file_mtime,include_file_ctime
+          # Only reuse a cached result if the source file and every file it includes are unchanged.
+          # ccache's fallback check cannot see GPU-only code on ROCm 10.1, so it could reuse a result with old GPU code, which is not we want.
+          ccache --set-config=depend_mode=true
 
       - name: Dependencies
         id: depends
@@ -968,6 +978,8 @@ jobs:
     runs-on: windows-2022
 
     strategy:
+      # Same as ubuntu-24-rocm: one ROCm version failing must not cancel the others.
+      fail-fast: false
       matrix:
         include:
           - ROCM_VERSION: "7.14.0"
@@ -992,15 +1004,8 @@ jobs:
           repository: 'ggml-org/llama.cpp'
           ref: ${{ needs.resolve-upstream.outputs.sha }}
 
-      - name: Cache ROCm Installation
-        id: cache-rocm
-        uses: actions/cache@v4
-        with:
-          path: C:\TheRock\build
-          key: rocm-wheels-${{ matrix.ROCM_VERSION }}-${{ runner.os }}-v2
-
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.16
+        uses: ggml-org/ccache-action@v1.2.21
         with:
           key: windows-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
@@ -1008,13 +1013,26 @@ jobs:
           # overflowing the 500MB default and thrashing the cache across runs.
           max-size: "2G"
 
+      - name: Tune ccache for reinstalled ROCm toolchain
+        run: |
+          # Same fix as ubuntu-24-rocm.
+          # pip writes every file it installs with a fresh mtime, and clang.exe comes from the rocm-sdk-core wheel, so each install gives the compiler a new mtime.
+          # With the default compiler_check=mtime, that turns every lookup into a miss and a warm build into a 2-4h cold one; hash compiler contents instead.
+          ccache --set-config=compiler_check=content
+          if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
+          ccache --set-config=sloppiness=time_macros,include_file_mtime,include_file_ctime
+          if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
+          # Same as ubuntu-24-rocm: never reuse a result with old GPU code.
+          ccache --set-config=depend_mode=true
+          if ($LASTEXITCODE -ne 0) { throw "ccache --set-config failed with exit code $LASTEXITCODE" }
+
       - name: Install ROCm with Wheels
-        if: steps.cache-rocm.outputs.cache-hit != 'true'
         run: |
           $ErrorActionPreference = "Stop"
           write-host "Setting up Python virtual environment"
 
-          # Create the venv directly at the cache location to avoid relocation issues
+          # Keep the install at the same fixed path every run.
+          # ccache hashes the absolute include paths, so a path that moved would miss every time.
           New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
           python -m venv C:\TheRock\build\.venv
           & C:\TheRock\build\.venv\Scripts\Activate.ps1
@@ -1026,7 +1044,7 @@ jobs:
           # Install ROCm wheels for multi-arch support (this may take several minutes)
           python -m pip install --index-url ${{ matrix.repo }} "rocm[libraries,devel]==${{ matrix.ROCM_VERSION }}"
 
-          # Pre-expand the devel tree so it is included in the cache
+          # Expand the devel tree (compilers, headers) now so a failure surfaces here
           write-host "Initializing ROCm devel tree"
           rocm-sdk init
           if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
@@ -1036,7 +1054,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Activate venv from cache or fresh install
+          # Activate the venv created by the install step
           & C:\TheRock\build\.venv\Scripts\Activate.ps1
 
           # Expand the devel tree (idempotent; no-op if already done during install)
@@ -1065,6 +1083,21 @@ jobs:
 
       - name: Build
         run: |
+          # Upstream embeds an application manifest in every .exe (ggml-org/llama.cpp#31329).
+          # ROCm's lld-link hands that to mt.exe from the Windows SDK, which is not on PATH outside a VS developer shell.
+          # mt.exe can't be copied out on its own (it fails to start without its SDK siblings), so append its whole folder for this step only.
+          # Appending keeps it from shadowing anything already on PATH.
+          $mt = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Directory.Parent.Name -match '^\d+(\.\d+){1,3}$' } |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if (-not $mt) { throw "mt.exe not found in the Windows SDK; lld-link needs it to embed app manifests" }
+          write-host "Using $($mt.FullName)"
+          $env:PATH = "$env:PATH;$($mt.DirectoryName)"
+          # A negative exit code is an NTSTATUS from the loader (e.g. a missing DLL), not mt.exe's own usage error.
+          mt.exe /? | Out-Null
+          if ($LASTEXITCODE -lt 0) { throw ("mt.exe could not start (0x{0:X8})" -f $LASTEXITCODE) }
+
           mkdir build
           cd build
           cmake .. `
@@ -1525,6 +1558,11 @@ jobs:
       - qualify-tier0
       - qualify-tier1
 
+    # For publish-qualification: which ROCm archives the post-merge checks ran on, and which this run uploaded.
+    outputs:
+      post_merge_checked: ${{ steps.post_merge.outputs.archives }}
+      published_rocm: ${{ steps.published_rocm.outputs.archives }}
+
     steps:
       - name: Clone
         id: checkout
@@ -1775,9 +1813,11 @@ jobs:
         run: |
           shopt -s nullglob
           mkdir -p fragments
+          checked=""
           for archive in release/llama-${TAG}-bin-ubuntu-rocm-*.tar.gz \
                          release/llama-${TAG}-bin-win-rocm-*.zip; do
             base=$(basename "$archive")
+            checked="${checked:+$checked }$base"
             if [[ "$base" == *-win-rocm-* ]]; then os=win; else os=ubuntu; fi
             ver=$(sed -E 's/.*-rocm-([0-9]+\.[0-9]+)-x64\..*/\1/' <<<"$base")
             echo "::group::Post-merge — $base"
@@ -1786,7 +1826,9 @@ jobs:
               --output "fragments/tier0-postmerge-$os-rocm-$ver.json" || true
             echo "::endgroup::"
           done
+          echo "archives=$checked" >> "$GITHUB_OUTPUT"
 
+      # An archive with no report at all (its build failed) blocks its ROCm version too.
       - name: Qualify ROCm release artifacts
         id: qualify
         continue-on-error: true
@@ -1799,6 +1841,8 @@ jobs:
             --tag "$TAG" \
             --records-dir ./qualification \
             --output-summary ./qualification/qualification-summary.json \
+            --operating-systems "$ROCM_OPERATING_SYSTEMS" \
+            --rocm-versions "$ROCM_VERSIONS" \
             --fail-on-no-promote
 
       # Hand the records to publish-qualification, which adds them to the dashboard feed.
@@ -1868,6 +1912,64 @@ jobs:
             cp -v "$record" release/
           done
 
+      # The release notes link only the files this run is about to attach.
+      # A family dropped above (incomplete, or a ROCm version that did not qualify) gets no link.
+      # Written to a file because it is used twice: to create the release, and to rewrite the notes once the upload succeeded.
+      - name: Write release notes
+        uses: actions/github-script@v8
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+          RELEASE_SUMMARY: ${{ steps.release_summary.outputs.value }}
+        with:
+          script: |
+            const fs = require('fs');
+            const tag = process.env.TAG_NAME;
+            const { owner, repo } = context.repo;
+            const files = fs.readdirSync('./release');
+            const attached = new Set(files);
+            const url = (file) => `https://github.com/${owner}/${repo}/releases/download/${tag}/${file}`;
+            const link = (label, file) => attached.has(file) ? [`- [${label}](${url(file)})`] : [];
+            const any = (pattern) => files.some((file) => pattern.test(file));
+            const versions = process.env.ROCM_VERSIONS.split(',').map((v) => v.trim()).filter(Boolean);
+            const rocm = (os, v) => os === 'win'
+              ? `llama-${tag}-bin-win-rocm-${v}-x64.zip`
+              : `llama-${tag}-bin-ubuntu-rocm-${v}-x64.tar.gz`;
+            const cudaNote = '(replace XX with your GPU compute capability)';
+
+            const linux = [
+              ...versions.flatMap((v) => link(`Ubuntu x64 (ROCm ${v})`, rocm('ubuntu', v))),
+              ...(any(new RegExp(`^llama-${tag}-ubuntu-cuda-sm_\\d+-x64\\.tar\\.xz$`))
+                ? ['- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` ' + cudaNote] : []),
+              ...(any(new RegExp(`^llama-${tag}-ubuntu-cuda-sm_\\d+-arm64\\.tar\\.xz$`))
+                ? ['- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` ' + cudaNote] : []),
+              ...files
+                .map((file) => file.match(new RegExp(`^llama-${tag}-bin-ubuntu-(\\d+)-openvino-(.+)-x64\\.tar\\.gz$`)))
+                .filter(Boolean)
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .flatMap((m) => link(`Ubuntu ${m[1]}.04 x64 (OpenVINO ${m[2]})`, m[0])),
+            ];
+            const windows = [
+              ...versions.flatMap((v) => link(`Windows x64 (ROCm ${v})`, rocm('win', v))),
+              ...(any(new RegExp(`^llama-${tag}-windows-cuda-sm_\\d+-x64\\.7z$`))
+                ? ['- Windows x64 (CUDA): `llama-' + tag + '-windows-cuda-sm_XX-x64.7z` ' + cudaNote] : []),
+            ];
+            // A ROCm version ships as a Windows + Linux pair or not at all.
+            const withheld = versions.filter((v) => !attached.has(rocm('ubuntu', v)) || !attached.has(rocm('win', v)));
+            const plural = withheld.length > 1;
+
+            const body = [
+              '<details open>', '', process.env.RELEASE_SUMMARY, '', '</details>', '',
+              ...(linux.length ? ['**Linux:**', ...linux, ''] : []),
+              ...(windows.length ? ['**Windows:**', ...windows, ''] : []),
+              ...(withheld.length
+                ? [`ROCm ${withheld.join(', ')} ${plural ? 'are' : 'is'} not in this release: ` +
+                   `${plural ? 'they' : 'it'} did not build, or did not pass the release checks. ` +
+                   'The attached `qualification-*.json` records list the failing checks.']
+                : []),
+            ].join('\n').trimEnd() + '\n';
+            fs.writeFileSync('release-notes.md', body);
+            core.info(body);
+
       # Get the release for this tag, creating it if it does not exist yet.
       # This is idempotent: if a previous run created the release but failed
       # partway through uploading (e.g. a transient GitHub outage), re-running
@@ -1877,25 +1979,12 @@ jobs:
         uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ steps.tag.outputs.name }}
-          RELEASE_SUMMARY: ${{ steps.release_summary.outputs.value }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
             const tag = process.env.TAG_NAME;
             const { owner, repo } = context.repo;
-
-            // The OpenVINO version is resolved from upstream at build time, so it is not known here.
-            // Derive the download links from the files actually staged for this release
-            // instead of hardcoding a version that goes stale (and 404s) the next time it moves.
-            const fs = require('fs');
-            const openvinoLinks = (fs.existsSync('release') ? fs.readdirSync('release') : [])
-              .filter(f => f.includes('-openvino-') && f.endsWith('.tar.gz'))
-              .sort()
-              .map(f => {
-                const m = f.match(/-bin-ubuntu-(\d+)-openvino-(.+)-x64\.tar\.gz$/);
-                const label = m ? `Ubuntu ${m[1]}.04 x64 (OpenVINO ${m[2]})` : f;
-                return `- [${label}](https://github.com/${owner}/${repo}/releases/download/${tag}/${f})`;
-              });
 
             let release;
             try {
@@ -1903,27 +1992,7 @@ jobs:
               core.info(`Reusing existing release ${tag} (id ${release.id})`);
             } catch (e) {
               if (e.status !== 404) throw e;
-              const body = [
-                '<details open>',
-                '',
-                process.env.RELEASE_SUMMARY,
-                '',
-                '</details>',
-                '',
-                '**Linux:**',
-                `- [Ubuntu x64 (ROCm 7.14)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-rocm-7.14-x64.tar.gz)`,
-                `- [Ubuntu x64 (ROCm 10.0)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-rocm-10.0-x64.tar.gz)`,
-                `- [Ubuntu x64 (ROCm 10.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-ubuntu-rocm-10.1-x64.tar.gz)`,
-                '- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` (replace XX with your GPU compute capability)',
-                '- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` (replace XX with your GPU compute capability)',
-                ...openvinoLinks,
-                '',
-                '**Windows:**',
-                `- [Windows x64 (ROCm 7.14)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-7.14-x64.zip)`,
-                `- [Windows x64 (ROCm 10.0)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-10.0-x64.zip)`,
-                `- [Windows x64 (ROCm 10.1)](https://github.com/${owner}/${repo}/releases/download/${tag}/llama-${tag}-bin-win-rocm-10.1-x64.zip)`,
-                '- Windows x64 (CUDA): `llama-' + tag + '-windows-cuda-sm_XX-x64.7z` (replace XX with your GPU compute capability)',
-              ].join('\n');
+              const body = fs.readFileSync('release-notes.md', 'utf8');
               try {
                 release = (await github.rest.repos.createRelease({ owner, repo, tag_name: tag, body })).data;
                 core.info(`Created release ${tag} (id ${release.id})`);
@@ -2026,6 +2095,38 @@ jobs:
 
             core.info(`Done: ${uploaded} uploaded, ${skipped} already present, ${files.length} total.`);
 
+      # For the feed: the ROCm archives this run attached to the release.
+      - name: Record published ROCm archives
+        id: published_rocm
+        if: steps.upload_release.outcome == 'success'
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          shopt -s nullglob
+          archives=""
+          for archive in release/llama-${TAG}-bin-ubuntu-rocm-*.tar.gz release/llama-${TAG}-bin-win-rocm-*.zip; do
+            archives="${archives:+$archives }$(basename "$archive")"
+          done
+          echo "archives=$archives" >> "$GITHUB_OUTPUT"
+          echo "Published ROCm archives: ${archives:-none}"
+
+      # A release reused from an earlier run of the same tag still carries that run's notes.
+      # The upload above has just made its files match this run, so make the notes match too.
+      - name: Update release notes
+        if: steps.upload_release.outcome == 'success'
+        uses: actions/github-script@v8
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            await github.rest.repos.updateRelease({
+              owner, repo, release_id: Number(process.env.RELEASE_ID),
+              body: fs.readFileSync('release-notes.md', 'utf8'),
+            });
+
       - name: Fail if any artifacts were missing
         if: steps.check_artifacts.outputs.missing != '0'
         run: |
@@ -2040,7 +2141,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Publish this run's ROCm qualification records to the qualification-data branch, where the dashboard polls them.
-  # Every record is published irrespective of it passing or failing.
+  # Every record is published irrespective of it passing or failing, and every ROCm archive the run should have built gets a row, including one whose build failed.
   # A feed that only held the runs that shipped would show nothing but successes.
   # The format is described in .github/qualify-rocm/FEED.md.
   # ---------------------------------------------------------------------------
@@ -2049,7 +2150,8 @@ jobs:
     # nothing about the ROCm records it wrote, so publish after either outcome.
     # Skipped along with the release job on pull requests and on dispatches
     # without create_release so neither produces records.
-    if: ${{ always() && (needs.release.result == 'success' || needs.release.result == 'failure') }}
+    # Without resolve-upstream there is no build number and nothing was built.
+    if: ${{ always() && needs.resolve-upstream.result == 'success' && (needs.release.result == 'success' || needs.release.result == 'failure') }}
 
     needs:
       - resolve-upstream
@@ -2059,6 +2161,7 @@ jobs:
 
     permissions:
       contents: write # to push to the qualification-data branch
+      actions: read   # to read each ROCm build job's result
 
     steps:
       - name: Checkout qualification suite
@@ -2066,6 +2169,7 @@ jobs:
         with:
           path: lemonade-ci
 
+      # Written by the release job when it got as far as qualifying the ROCm archives.
       - name: Download qualification records
         continue-on-error: true
         uses: actions/download-artifact@v7
@@ -2073,19 +2177,65 @@ jobs:
           name: qualification-records
           path: ./records
 
-      - name: Publish to qualification-data branch
+      - name: Download qualification fragments
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: qualify-fragments-*
+          path: ./fragments
+          merge-multiple: true
+
+      # If the release job stopped before writing records, build them here from the Tier 0 and Tier 1 reports.
+      - name: Collect qualification records
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve-upstream.outputs.tag }}
         run: |
           set -euo pipefail
           shopt -s nullglob
-          records=(records/qualification-*.json)
-          if [ ${#records[@]} -eq 0 ]; then
-            echo "::warning::The release job produced no qualification records, so there is nothing to publish."
+          records=(records/qualification-llama-*.json)
+          if [ ${#records[@]} -gt 0 ]; then
+            echo "Using the ${#records[@]} record(s) the release job wrote."
             exit 0
           fi
+          echo "The release job wrote no records; building them from the Tier 0 and Tier 1 reports."
+          rm -rf records
+          mkdir -p records fragments
+          python3 lemonade-ci/.github/qualify-rocm/aggregate.py \
+            --fragments-dir ./fragments \
+            --tag "$TAG" \
+            --records-dir ./records \
+            --output-summary ./records/qualification-summary.json \
+            --operating-systems "$ROCM_OPERATING_SYSTEMS" \
+            --rocm-versions "$ROCM_VERSIONS"
 
+      # build_result for every row, and the reason for an archive that has no record.
+      - name: Read build job results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            if gh api --paginate \
+                "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=latest&per_page=100" \
+                --jq '.jobs[] | {name, conclusion}' > jobs.jsonl; then
+              grep -E '"name":"(ubuntu-24-rocm|windows-rocm) ' jobs.jsonl || true
+              exit 0
+            fi
+            echo "Could not read the run's jobs (attempt $attempt); retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::warning::Could not read the run's jobs; build_result will be 'unknown'."
+          : > jobs.jsonl
+
+      - name: Publish to qualification-data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve-upstream.outputs.tag }}
+          UPSTREAM_SHA: ${{ needs.resolve-upstream.outputs.sha }}
+          PUBLISHED_ROCM: ${{ needs.release.outputs.published_rocm }}
+          POST_MERGE_CHECKED: ${{ needs.release.outputs.post_merge_checked }}
+        run: |
+          set -euo pipefail
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
@@ -2111,7 +2261,14 @@ jobs:
 
             python3 lemonade-ci/.github/qualify-rocm/publish_qualification.py \
               --records-dir records \
-              --data-dir data/qualification
+              --data-dir data/qualification \
+              --operating-systems "$ROCM_OPERATING_SYSTEMS" \
+              --rocm-versions "$ROCM_VERSIONS" \
+              --tag "$TAG" \
+              --upstream-sha "$UPSTREAM_SHA" \
+              --jobs-file jobs.jsonl \
+              --published-artifacts "$PUBLISHED_ROCM" \
+              --post-merge-checked "$POST_MERGE_CHECKED"
             # Keep the format description next to the data it describes.
             cp lemonade-ci/.github/qualify-rocm/FEED.md data/qualification/SCHEMA.md
 
