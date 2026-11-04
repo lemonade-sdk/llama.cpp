@@ -1913,7 +1913,7 @@ jobs:
           done
 
       # The release notes link only the files this run is about to attach.
-      # A family dropped above (incomplete, or a ROCm version that did not qualify) gets no link.
+      # A family dropped above (incomplete, or a ROCm version that did not qualify) gets no link, and is named under "Not in this release" instead.
       # Written to a file because it is used twice: to create the release, and to rewrite the notes once the upload succeeded.
       - name: Write release notes
         uses: actions/github-script@v8
@@ -1928,44 +1928,78 @@ jobs:
             const files = fs.readdirSync('./release');
             const attached = new Set(files);
             const url = (file) => `https://github.com/${owner}/${repo}/releases/download/${tag}/${file}`;
-            const link = (label, file) => attached.has(file) ? [`- [${label}](${url(file)})`] : [];
-            const any = (pattern) => files.some((file) => pattern.test(file));
+            const md = (label, file) => `[${label}](${url(file)})`;
             const versions = process.env.ROCM_VERSIONS.split(',').map((v) => v.trim()).filter(Boolean);
             const rocm = (os, v) => os === 'win'
               ? `llama-${tag}-bin-win-rocm-${v}-x64.zip`
               : `llama-${tag}-bin-ubuntu-rocm-${v}-x64.tar.gz`;
-            const cudaNote = '(replace XX with your GPU compute capability)';
+            const cpu = `llama-${tag}-bin-win-cpu-x64.zip`;
 
-            const linux = [
-              ...versions.flatMap((v) => link(`Ubuntu x64 (ROCm ${v})`, rocm('ubuntu', v))),
-              ...(any(new RegExp(`^llama-${tag}-ubuntu-cuda-sm_\\d+-x64\\.tar\\.xz$`))
-                ? ['- Ubuntu x64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-x64.tar.xz` ' + cudaNote] : []),
-              ...(any(new RegExp(`^llama-${tag}-ubuntu-cuda-sm_\\d+-arm64\\.tar\\.xz$`))
-                ? ['- Ubuntu arm64 (CUDA): `llama-' + tag + '-ubuntu-cuda-sm_XX-arm64.tar.xz` ' + cudaNote] : []),
-              ...files
-                .map((file) => file.match(new RegExp(`^llama-${tag}-bin-ubuntu-(\\d+)-openvino-(.+)-x64\\.tar\\.gz$`)))
-                .filter(Boolean)
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .flatMap((m) => link(`Ubuntu ${m[1]}.04 x64 (OpenVINO ${m[2]})`, m[0])),
+            // Lowest Ubuntu each Linux package starts on, set by the glibc and libstdc++ of the
+            // runner image its build job uses. Update these if a job moves to another image.
+            const ROCM_RUNS_ON = 'Ubuntu 24.04 or newer';
+            const CUDA_RUNS_ON = 'Ubuntu 22.04 or newer';
+            // Both OpenVINO builds start on 24.04. Each is labelled with the Ubuntu it is meant for,
+            // so a 24.04 user picks the build made against OpenVINO's own Ubuntu 24.04 runtime.
+            const OPENVINO_FOR = { '22': 'Ubuntu 22.04', '24': 'Ubuntu 24.04 or newer' };
+
+            // Every CUDA arch attached for one platform, in arch order: [sm_75](...) [sm_80](...) ...
+            const cudaLinks = (prefix, suffix) => files
+              .map((file) => file.match(new RegExp(`^llama-${tag}-${prefix}-cuda-sm_(\\d+)-${suffix}$`)))
+              .filter(Boolean)
+              .sort((a, b) => Number(a[1]) - Number(b[1]))
+              .map((m) => md(`sm_${m[1]}`, m[0]));
+            const openvino = files
+              .map((file) => file.match(new RegExp(`^llama-${tag}-bin-ubuntu-(\\d+)-openvino-(.+)-x64\\.tar\\.gz$`)))
+              .filter(Boolean)
+              .sort((a, b) => Number(a[1]) - Number(b[1]));
+
+            const linuxX64 = [
+              ...versions.filter((v) => attached.has(rocm('ubuntu', v)))
+                .map((v) => [`ROCm ${v}`, ROCM_RUNS_ON, md('download', rocm('ubuntu', v))]),
+              ...openvino.map((m) => [`OpenVINO ${m[2]}`, OPENVINO_FOR[m[1]] || `Ubuntu ${m[1]}.04 or newer`, md('download', m[0])]),
+              ...(() => {
+                const links = cudaLinks('ubuntu', 'x64\\.tar\\.xz');
+                return links.length ? [['CUDA', CUDA_RUNS_ON, links.join(' ')]] : [];
+              })(),
             ];
+            const linuxArm64 = (() => {
+              const links = cudaLinks('ubuntu', 'arm64\\.tar\\.xz');
+              return links.length ? [['CUDA', CUDA_RUNS_ON, links.join(' ')]] : [];
+            })();
+            const table = (title, rows) => rows.length
+              ? [`**${title}**`, '', '| Package | Runs on | Download |', '|---|---|---|', ...rows.map((r) => `| ${r.join(' | ')} |`), '']
+              : [];
+
+            const windowsCuda = cudaLinks('windows', 'x64\\.7z');
+            const windowsRocm = versions.filter((v) => attached.has(rocm('win', v)))
+              .map((v) => md(v, rocm('win', v)));
             const windows = [
-              ...versions.flatMap((v) => link(`Windows x64 (ROCm ${v})`, rocm('win', v))),
-              ...(any(new RegExp(`^llama-${tag}-windows-cuda-sm_\\d+-x64\\.7z$`))
-                ? ['- Windows x64 (CUDA): `llama-' + tag + '-windows-cuda-sm_XX-x64.7z` ' + cudaNote] : []),
+              ...(attached.has(cpu) ? [`- CPU: ${md('download', cpu)}`] : []),
+              ...(windowsRocm.length ? [`- ROCm: ${windowsRocm.join(' | ')}`] : []),
+              ...(windowsCuda.length ? [`- CUDA: ${windowsCuda.join(' | ')}`] : []),
             ];
-            // A ROCm version ships as a Windows + Linux pair or not at all.
-            const withheld = versions.filter((v) => !attached.has(rocm('ubuntu', v)) || !attached.has(rocm('win', v)));
-            const plural = withheld.length > 1;
+
+            // Anything the release normally carries but this run is not attaching.
+            // A ROCm version ships as a Windows + Linux pair or not at all, and one failed CUDA arch drops every CUDA build.
+            const missing = [
+              ...versions
+                .filter((v) => !attached.has(rocm('ubuntu', v)) || !attached.has(rocm('win', v)))
+                .map((v) => `- ROCm ${v}: did not build, or did not pass the release checks. The attached \`qualification-*.json\` records list the failing checks.`),
+              ...(files.some((file) => file.includes('-cuda-sm_'))
+                ? [] : ['- CUDA: at least one CUDA build failed, so no CUDA builds are included.']),
+              ...Object.entries(OPENVINO_FOR)
+                .filter(([ubuntu]) => !openvino.some((m) => m[1] === ubuntu))
+                .map(([, label]) => `- OpenVINO for ${label}: did not build, or did not pass its package checks.`),
+              ...(attached.has(cpu) ? [] : ['- Windows CPU: did not build.']),
+            ];
 
             const body = [
               '<details open>', '', process.env.RELEASE_SUMMARY, '', '</details>', '',
-              ...(linux.length ? ['**Linux:**', ...linux, ''] : []),
-              ...(windows.length ? ['**Windows:**', ...windows, ''] : []),
-              ...(withheld.length
-                ? [`ROCm ${withheld.join(', ')} ${plural ? 'are' : 'is'} not in this release: ` +
-                   `${plural ? 'they' : 'it'} did not build, or did not pass the release checks. ` +
-                   'The attached `qualification-*.json` records list the failing checks.']
-                : []),
+              ...table('Linux x64', linuxX64),
+              ...table('Linux arm64', linuxArm64),
+              ...(windows.length ? ['**Windows x64**', ...windows, ''] : []),
+              ...(missing.length ? ['**Not in this release**', ...missing] : []),
             ].join('\n').trimEnd() + '\n';
             fs.writeFileSync('release-notes.md', body);
             core.info(body);
