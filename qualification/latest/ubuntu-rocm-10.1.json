@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-04T12:53:13Z",
+  "generated_at": "2026-11-05T04:34:40Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@41826137363",
-    "artifact": "llama-b12109-bin-ubuntu-rocm-10.1-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@41938999326",
+    "artifact": "llama-b12120-bin-ubuntu-rocm-10.1-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12109",
-    "upstream_sha": "13ec8f614cfef964fe97bbf872bc436dbc484a1f",
+    "llamacpp_tag": "b12120",
+    "upstream_sha": "3de52ac38818978d6da8f386eda43a856e53714a",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "41826137363",
+    "run_id": "41938999326",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 294782010
+            "bytes": 318057966
           }
         },
         {
@@ -103,7 +103,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1420931656
+            "bytes": 1533383224
           }
         },
         {
@@ -112,14 +112,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 13712,
+          "duration_ms": 25474,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1420931656,
+            "bytes_scanned": 1533383224,
             "bundle_magic_count": 141,
-            "expected_count": 27,
-            "present_count": 27,
+            "expected_count": 29,
+            "present_count": 29,
             "expected": [
               "gfx1010",
               "gfx1011",
@@ -139,6 +139,8 @@
               "gfx1151",
               "gfx1152",
               "gfx1153",
+              "gfx1170",
+              "gfx1171",
               "gfx1200",
               "gfx1201",
               "gfx900",
@@ -168,6 +170,8 @@
               "gfx1151",
               "gfx1152",
               "gfx1153",
+              "gfx1170",
+              "gfx1171",
               "gfx1200",
               "gfx1201",
               "gfx900",
@@ -199,6 +203,8 @@
               "gfx1151": 141,
               "gfx1152": 141,
               "gfx1153": 141,
+              "gfx1170": 141,
+              "gfx1171": 141,
               "gfx1200": 141,
               "gfx1201": 141,
               "gfx900": 141,
@@ -247,7 +253,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 6,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -265,7 +271,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -295,14 +301,14 @@
               "libllama-batched-bench-impl.so": "2.4",
               "libllama-bench-impl.so": "2.38",
               "libllama-cli-impl.so": "2.38",
-              "libllama-common.so.0.8.0": "2.38",
+              "libllama-common.so.0.9.0": "2.38",
               "libllama-completion-impl.so": "2.32",
               "libllama-fit-params-impl.so": "2.4",
               "libllama-perplexity-impl.so": "2.38",
               "libllama-quantize-impl.so": "2.38",
               "libllama-server-impl.so": "2.38",
-              "libllama.so.0.8.0": "2.38",
-              "libmtmd.so.0.8.0": "2.38",
+              "libllama.so.0.9.0": "2.38",
+              "libmtmd.so.0.9.0": "2.38",
               "llama": "2.34",
               "llama-batched-bench": "2.34",
               "llama-bench": "2.34",
@@ -332,7 +338,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 2,
+          "duration_ms": 4,
           "error": null,
           "details": {
             "leaked": {}
@@ -344,7 +350,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 14,
+          "duration_ms": 19,
           "error": null,
           "details": {
             "returncode": 0,
@@ -363,9 +369,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b12109",
+            "inner_dir_tag": "b12120",
             "top_level": [
-              "llama-b12109"
+              "llama-b12120"
             ]
           }
         },
@@ -375,7 +381,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "rocm_dirs_searched": 6,
@@ -448,7 +454,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 594,
+          "duration_ms": 623,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -465,7 +471,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 488,
+          "duration_ms": 505,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
@@ -516,6 +522,8 @@
       "gfx1151",
       "gfx1152",
       "gfx1153",
+      "gfx1170",
+      "gfx1171",
       "gfx1200",
       "gfx1201",
       "gfx900",
@@ -545,6 +553,8 @@
       "gfx1151",
       "gfx1152",
       "gfx1153",
+      "gfx1170",
+      "gfx1171",
       "gfx1200",
       "gfx1201",
       "gfx900",
