@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-09T00:56:00Z",
+  "generated_at": "2026-11-09T12:43:43Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@42538545228",
-    "artifact": "llama-b12211-bin-ubuntu-rocm-10.1-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@42613997434",
+    "artifact": "llama-b12223-bin-ubuntu-rocm-10.1-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12211",
-    "upstream_sha": "7d7f0287530bc8981690f361d8c1627dbae1c99a",
+    "llamacpp_tag": "b12223",
+    "upstream_sha": "0c6dca2faeb5650c74464bd5938f856058953ef9",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "42538545228",
+    "run_id": "42613997434",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 318155927
+            "bytes": 318145291
           }
         },
         {
@@ -112,7 +112,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 26540,
+          "duration_ms": 26411,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
@@ -338,7 +338,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "error": null,
           "details": {
             "leaked": {}
@@ -350,7 +350,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 20,
+          "duration_ms": 19,
           "error": null,
           "details": {
             "returncode": 0,
@@ -369,9 +369,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b12211",
+            "inner_dir_tag": "b12223",
             "top_level": [
-              "llama-b12211"
+              "llama-b12223"
             ]
           }
         },
@@ -454,7 +454,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 619,
+          "duration_ms": 764,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -471,7 +471,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 489,
+          "duration_ms": 668,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
