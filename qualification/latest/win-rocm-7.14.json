@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-10T00:38:14Z",
+  "generated_at": "2026-11-10T15:52:15Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-7.14-x64.zip@42725774657",
-    "artifact": "llama-b12240-bin-win-rocm-7.14-x64.zip",
+    "build_id": "llama-bin-win-rocm-7.14-x64.zip@42812595764",
+    "artifact": "llama-b12264-bin-win-rocm-7.14-x64.zip",
     "os": "win",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b12240",
-    "upstream_sha": "711f9f4c117042570ef66ef58fba1f15835a331b",
+    "llamacpp_tag": "b12264",
+    "upstream_sha": "4ed88da2ea2a51edc158efe0ee2a1e452d75644d",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "42725774657",
+    "run_id": "42812595764",
     "run_attempt": "1"
   },
   "overall": "warn",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 104,
             "missing": [],
-            "bytes": 220291679
+            "bytes": 220300896
           }
         },
         {
@@ -123,7 +123,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 13125,
+          "duration_ms": 9079,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
@@ -274,11 +274,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 31,
+          "duration_ms": 14,
           "error": null,
           "details": {
             "returncode": 0,
-            "help_bytes": 61505,
+            "help_bytes": 61840,
             "flags_checked": 12,
             "flags_missing": []
           }
@@ -405,7 +405,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 295,
+          "duration_ms": 296,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -456,7 +456,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 15,
+          "duration_ms": 32,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -477,7 +477,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 1015,
+          "duration_ms": 733,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -494,7 +494,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 515,
+          "duration_ms": 500,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
