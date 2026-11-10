@@ -188,7 +188,7 @@ def check_contents(root, os_name):
 
     # Every build job passes the shared CMAKE_ARGS, whose -DLLAMA_BUILD_TESTS=OFF
     # keeps upstream's unit-test binaries out of the archive.
-    # Any test-* file here means a build job has stopped passing CMAKE_ARGS.
+    # Any test-* file here means the build did not receive -DLLAMA_BUILD_TESTS=OFF.
     tests = sorted(f for f in files if f.startswith("test-"))
     details = {"entries": len(files), "missing": missing,
                "test_binaries_shipped": len(tests), "test_binaries": tests[:10]}
