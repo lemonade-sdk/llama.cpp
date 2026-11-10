@@ -1100,6 +1100,7 @@ jobs:
 
           mkdir build
           cd build
+          # CMAKE_ARGS keeps upstream's tests and examples out of the zip, as on every other build job (T0.1 warns if tests ship).
           cmake .. `
             -G "Unix Makefiles" `
             -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
@@ -1114,7 +1115,8 @@ jobs:
             -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
             -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
             -DHIP_PATH="${env:HIP_PATH}" `
-            -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}"
+            -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}" `
+            ${{ env.CMAKE_ARGS }}
           cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
 
       - name: Verify HIP backend was built
