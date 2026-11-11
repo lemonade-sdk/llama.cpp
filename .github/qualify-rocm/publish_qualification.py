@@ -15,7 +15,7 @@ Every archive the run was meant to build gets a row.
 An archive with no record (its build failed / no check ever reported on it) gets a placeholder row and a placeholder report saying so. Therefore, a failing build shows up in the feed instead of silently leaving a gap.
 
 A test the record does not contain is reported as either:
-  - "not_applicable": it is never run for this archive -- the post-merge checks T0.10 and T0.11 on an archive that never reached them (it was dropped from the release before they ran); or
+  - "not_applicable": it is never run for this archive -- the final-archive check T0.11 on an archive that never reached it (it was dropped from the release before they ran); or
   - "missing": it should have run and did not.
 Neither is folded into "failed"; `qualified` is the verdict.
 
@@ -51,11 +51,11 @@ SCHEMA_VERSION = 2
 # A test id not listed here is still published, never dropped.
 TIER_TESTS = {
     "tier0": ["T0.1", "T0.2", "T0.3", "T0.4", "T0.5", "T0.6",
-              "T0.7", "T0.8", "T0.10", "T0.11", "T0.12"],
+              "T0.7", "T0.8", "T0.11", "T0.12"],
     "tier1": ["T1.1", "T1.2", "T1.3", "T1.4", "T1.5"],
 }
 # Run by the release job on the archives still in the release after its completeness check.
-POST_MERGE_TESTS = {"T0.10", "T0.11"}
+POST_MERGE_TESTS = {"T0.11"}
 
 STATUS_MISSING = "missing"
 STATUS_NOT_APPLICABLE = "not_applicable"

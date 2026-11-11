@@ -32,11 +32,12 @@ Checks:
                                       exist in the ROCm a user will install
                                       (needs --rocm-dirs).
 
-(T0.10 and T0.11 are emitted separately by check_post_merge.py, which runs on
-the final archives after the release job assembles them. T0.9 is retired: it
-compared the tag in the archive's name with its inner folder, but ran before
-the release job adds the tag to the name, so it never compared anything. Its
-id is not reused.)
+(T0.11 is emitted separately by check_post_merge.py, which runs on the final
+archives in the release job. T0.9 is retired: it compared the tag in the
+archive's name with its inner folder, but ran before the release job adds the
+tag to the name, so it never compared anything. T0.10 is retired: it checked
+the merge of the Windows CPU zip into the ROCm zips, which the release job no
+longer does. Neither id is reused.)
 
 Usage:
     python3 tier0_static.py --archive llama-bin-ubuntu-rocm-10.1-x64.tar.gz \
