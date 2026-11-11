@@ -412,7 +412,10 @@ def check_linux_version_support(root, os_name):
 def check_rpath(root, os_name):
     """No absolute build-machine paths in RUNPATH.
 
-    The ROCm Linux job never runs the `patchelf --set-rpath '$ORIGIN'` normalisation.
+    The ROCm Linux job resets every binary's RUNPATH to '$ORIGIN' with patchelf
+    before packaging ("Normalize RPATH for portable distribution"). This catches
+    a build-machine path that survives it, e.g. if that step is removed or
+    stops reaching a file.
     """
     if os_name != "ubuntu":
         return (report.STATUS_SKIP, "Linux-only check", {})

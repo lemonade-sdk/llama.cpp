@@ -347,7 +347,7 @@ Everything else in the row means the same.
 |---|---|---|
 | `schema_version` | `2` | `1` (same row shape) |
 | `build_id` | `<run_id>-<os>-rocm-<rocm_version>` | `<run_id>-<os>-rocm-<gfx_family>` |
-| rows per run | 6 | 14 |
+| rows per run | 6 | 20 |
 | `tag` | llama.cpp build number; set on every row | that repository's release tag; `null` unless `published` |
 | `artifact` | always the release name | the untagged CI name unless `published` |
 | `os` | `win` \| `ubuntu` | `windows` \| `ubuntu` |
@@ -366,6 +366,11 @@ Everything else in the row means the same.
 Bump `schema_version` on any breaking change to `index.json` or the row shape.
 Adding a field is not breaking. The dashboard should read `schema_version` and
 show a notice, rather than break, on a version it does not know.
+
+The `schema_version` inside each record under `reports/` and `latest/` is a
+separate number. It versions the record written by `aggregate.py` (`report.py`
+sets it), not `index.json`, so the two do not have to match and change
+independently.
 
 Version 2 replaced version 1 because the meaning of existing fields changed:
 `version_qualified` now also counts an archive that never built, `overall` is
