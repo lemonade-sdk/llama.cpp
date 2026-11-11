@@ -51,7 +51,7 @@ SCHEMA_VERSION = 2
 # A test id not listed here is still published, never dropped.
 TIER_TESTS = {
     "tier0": ["T0.1", "T0.2", "T0.3", "T0.4", "T0.5", "T0.6",
-              "T0.7", "T0.8", "T0.9", "T0.10", "T0.11", "T0.12"],
+              "T0.7", "T0.8", "T0.10", "T0.11", "T0.12"],
     "tier1": ["T1.1", "T1.2", "T1.3", "T1.4", "T1.5"],
 }
 # Run by the release job on the archives still in the release after its completeness check.
@@ -90,14 +90,6 @@ def _int(value):
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _test_order(test_id):
-    """Sort "T0.10" after "T0.9", and unknown ids after known ones."""
-    match = re.match(r"^T(\d+)\.(\d+)$", test_id or "")
-    if match:
-        return (int(match.group(1)), int(match.group(2)), "")
-    return (sys.maxsize, sys.maxsize, test_id or "")
 
 
 def _run_order(run_id):
@@ -196,12 +188,12 @@ def collect_results(record, post_merge_checked):
     results = {test_id: by_id[test_id]["status"] if test_id in by_id
                else absent_status(record, test_id, post_merge_checked)
                for ids in TIER_TESTS.values() for test_id in ids}
-    for test_id in sorted((t for t in by_id if t not in results), key=_test_order):
+    for test_id in sorted((t for t in by_id if t not in results), key=report.test_order):
         results[test_id] = by_id[test_id]["status"]
 
     blocking = sorted((test_id for test_id, test in by_id.items()
                        if test.get("gating") and test.get("status") == "fail"),
-                      key=_test_order)
+                      key=report.test_order)
     return results, blocking
 
 
