@@ -24,8 +24,9 @@ The merge REPLACES every file the CPU zip shares with the ROCm zip
 qualify jobs tested the ROCm build's copies, so on Windows they did not test
 the shipped versions of those files. T0.10 lists which files were replaced.
 
-Deliberately cheap apart from reading each archive back once: it compares zip
-directories (name, CRC-32, size) rather than extracting ~1 GB fat binaries.
+Deliberately cheap apart from reading the final archive back and hashing the
+tested one: T0.10 compares zip directories (name, CRC-32, size) rather than
+extracting ~1 GB fat binaries.
 
 Every file is opened inside a check, so an archive that cannot be read is
 recorded as a FAIL instead of crashing the script and leaving no result.

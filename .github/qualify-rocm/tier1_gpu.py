@@ -302,9 +302,13 @@ def check_gpu_offload(server, base):
     requested = REQUESTED_OFFLOAD_RE.search(log)
 
     # The evidence as readable lines, sizes included, for whoever reads the report.
-    proof = [f"using device {e['device']}" + (f" ({e['name']})" if e["name"] else "")
-             for e in devices]
-    proof += [f"{dev} model buffer size = {mib:.2f} MiB" for dev, mib in allocated]
+    # Only recorded when it proves the point: a device line alone is not proof,
+    # and devices_selected / model_buffers_mib keep the raw findings either way.
+    proof = []
+    if devices and allocated:
+        proof = [f"using device {e['device']}" + (f" ({e['name']})" if e["name"] else "")
+                 for e in devices]
+        proof += [f"{dev} model buffer size = {mib:.2f} MiB" for dev, mib in allocated]
 
     props_status, props_raw = http_get(f"{base}/props")
     props = {}
