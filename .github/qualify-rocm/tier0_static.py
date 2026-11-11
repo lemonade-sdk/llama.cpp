@@ -5,8 +5,8 @@ Tier 0 -- static verification of a published ROCm archive. No GPU required.
 Runs on a free hosted runner against the ARCHIVE WE ARE ABOUT TO PUBLISH (or
 have just published), not against the build tree. That distinction matters because
 every bug this tier exists to catch -- a dropped gfx target, a missing CPU
-backend after the Windows merge, a leaked build path -- is invisible in the
-build tree and only appears in the packaged bytes.
+backend, a leaked build path -- is invisible in the build tree and only appears
+in the packaged bytes.
 
 Checks:
   T0.1  archive contents           -- every binary a user needs is present.
@@ -258,20 +258,15 @@ def check_gfx_targets(root, os_name, gpu_targets):
     return (report.STATUS_PASS, None, result)
 
 
-def check_cpu_variants(root, os_name, post_merge):
+def check_cpu_variants(root, os_name):
     files = listing(root)
     variants = fnmatch.filter(files, CPU_VARIANT_GLOB[os_name])
-    details = {"count": len(variants), "variants": sorted(variants),
-               "post_merge": post_merge}
+    details = {"count": len(variants), "variants": sorted(variants)}
     if not variants:
-        extra = ""
-        if os_name == "win" and post_merge:
-            extra = (" -- the release job's Windows CPU-backend merge did not land "
-                     "in this zip")
         return (report.STATUS_FAIL,
-                f"no CPU backend matching {CPU_VARIANT_GLOB[os_name]}{extra}", details)
+                f"no CPU backend matching {CPU_VARIANT_GLOB[os_name]}", details)
     # GGML_CPU_ALL_VARIANTS=ON produces well over a dozen; a single one means
-    # the variant build collapsed or only part of the merge arrived.
+    # the variant build collapsed.
     if len(variants) < 5:
         return (report.STATUS_WARN,
                 f"only {len(variants)} CPU backend variant(s); "
@@ -569,9 +564,6 @@ def main():
     parser.add_argument("--run-binaries", action="store_true",
                         help="this runner's OS matches the archive, so executables "
                              "in it can be launched (enables T0.8)")
-    parser.add_argument("--post-merge", action="store_true",
-                        help="the archive has been through the release job's "
-                             "Windows CPU-backend merge")
     parser.add_argument("--rocm-dirs", default=os.environ.get("ROCM_RUNTIME_DIRS", ""),
                         help="directories of a user-style ROCm install, separated "
                              "by the platform path separator. Supplied by "
@@ -626,7 +618,7 @@ def main():
         tier.run("T0.3", "gfx target audit",
                  lambda: check_gfx_targets(root, args.os_name, args.gpu_targets))
         tier.run("T0.4", "CPU backend variants",
-                 lambda: check_cpu_variants(root, args.os_name, args.post_merge))
+                 lambda: check_cpu_variants(root, args.os_name))
         tier.run("T0.5", "runtime dependency survey",
                  lambda: check_dependencies(root, args.os_name))
         tier.run("T0.6", "Linux version support",

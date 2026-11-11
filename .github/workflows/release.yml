@@ -1640,6 +1640,7 @@ jobs:
           # the qualify jobs tested with ones they never ran.
           echo "Renaming and moving zips to release..."
           for zip_file in artifact/llama-bin-win-*.zip; do
+            [ -f "$zip_file" ] || continue
             base_name=$(basename "$zip_file" .zip)
             zip_name="llama-${{ steps.tag.outputs.name }}-${base_name#llama-}.zip"
             echo "Moving $zip_file to release/$zip_name"
