@@ -221,7 +221,7 @@ Not in the feed:
   - `warn`: the check ran and found something worth recording that does not
     block, e.g. upstream test programs shipped in the archive (T0.1).
   - `skip`: the check ran but could not apply, e.g. T0.6 and T0.7 on Windows
-    (Linux-only checks).
+    (Linux-only checks) and T0.10 on Linux (a Windows-only check).
   - `missing`: the check should have run for this archive and did not. For
     Tier 1 this does not block the archive (see `qualified`), but it is still a
     gap: the archive was not tested on a GPU.

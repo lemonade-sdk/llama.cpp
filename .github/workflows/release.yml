@@ -286,8 +286,11 @@ jobs:
       # The qualification jobs must audit the fat binary against the SAME target
       # list this job compiled, so publish the matrix entry alongside the
       # artifact instead of duplicating it in another job.
+      # The SHA-256 lets the release job prove it is uploading the archive this job built and the qualify jobs tested (T0.11).
       - name: Record qualification metadata
         run: |
+          archive=llama-bin-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.tar.gz
+          sha256=$(sha256sum "$archive" | cut -d ' ' -f 1)
           cat > qualify-meta-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}.json <<EOF
           {
             "os": "ubuntu",
@@ -296,7 +299,8 @@ jobs:
             "gpu_targets": "${{ matrix.gpu_targets }}",
             "tag": "${{ steps.tag.outputs.name }}",
             "upstream_sha": "${{ needs.resolve-upstream.outputs.sha }}",
-            "artifact": "llama-bin-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.tar.gz"
+            "artifact": "$archive",
+            "sha256": "$sha256"
           }
           EOF
           cat qualify-meta-ubuntu-rocm-${{ env.ROCM_VERSION_SHORT }}.json
@@ -1146,8 +1150,10 @@ jobs:
           cp "LICENSE" "build\bin\"
           7z a -snl llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip .\build\bin\*
 
+      # Same as ubuntu-24-rocm, SHA-256 included. The release job rewrites this zip when it merges the CPU backend in, so T0.11 compares the copy it keeps from before the merge.
       - name: Record qualification metadata
         run: |
+          $archive = 'llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip'
           $meta = [ordered]@{
             os               = 'win'
             rocm_version     = '${{ env.ROCM_VERSION_SHORT }}'
@@ -1155,7 +1161,8 @@ jobs:
             gpu_targets      = '${{ matrix.gpu_targets }}'
             tag              = '${{ steps.tag.outputs.name }}'
             upstream_sha     = '${{ needs.resolve-upstream.outputs.sha }}'
-            artifact         = 'llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip'
+            artifact         = $archive
+            sha256           = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
           }
           $path = "qualify-meta-win-rocm-${{ env.ROCM_VERSION_SHORT }}.json"
           $meta | ConvertTo-Json | Set-Content -Path $path -Encoding utf8
@@ -1646,10 +1653,13 @@ jobs:
             unzip "$cpu_zip" -d "$temp_dir"
 
             echo "Adding CPU files to $arch zips..."
+            mkdir -p premerge
             for target_zip in artifact/llama-bin-win-*-${arch}.zip; do
               if [[ "$target_zip" == "$cpu_zip" ]]; then
                 continue
               fi
+              # The merge rewrites the zip in place. Keep the bytes the qualify jobs tested so the post-merge checks (T0.10, T0.11) can compare against them.
+              cp "$target_zip" premerge/
               echo "Adding CPU backend to $(basename "$target_zip")"
               realpath_target_zip=$(realpath "$target_zip")
               (cd "$temp_dir" && zip -r "$realpath_target_zip" .)
@@ -1822,10 +1832,18 @@ jobs:
             checked="${checked:+$checked }$base"
             if [[ "$base" == *-win-rocm-* ]]; then os=win; else os=ubuntu; fi
             ver=$(sed -E 's/.*-rocm-([0-9]+\.[0-9]+)-x64\..*/\1/' <<<"$base")
+            merge_args=()
+            if [ "$os" = win ]; then
+              merge_args=(--cpu-zip "release/llama-${TAG}-bin-win-cpu-x64.zip"
+                          --pre-merge "premerge/llama-bin-win-rocm-$ver-x64.zip")
+            fi
             echo "::group::Post-merge — $base"
+            # Every check records its own failure, so a crash here is a bug in the script; report it without stopping the release.
             python3 lemonade-ci/.github/qualify-rocm/check_post_merge.py \
               --archive "$archive" --os "$os" --rocm-version "$ver" --tag "$TAG" \
-              --output "fragments/tier0-postmerge-$os-rocm-$ver.json" || true
+              --meta "meta/qualify-meta-$os-rocm-$ver.json" "${merge_args[@]}" \
+              --output "fragments/tier0-postmerge-$os-rocm-$ver.json" \
+              || echo "::error::check_post_merge.py crashed on $base, so T0.10 and T0.11 will show as missing"
             echo "::endgroup::"
           done
           echo "archives=$checked" >> "$GITHUB_OUTPUT"

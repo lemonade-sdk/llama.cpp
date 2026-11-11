@@ -60,13 +60,18 @@ been packaged.
 | T0.6 | the archive still runs on the oldest Linux release we support | yes |
 | T0.7 | no build-machine paths left inside the binaries | yes |
 | T0.8 | `llama-server` still accepts the flags it is launched with | yes |
-| T0.10 | the Windows CPU backend merge landed | yes |
-| T0.11 | the finished archive still opens and is complete | yes |
+| T0.10 | Windows: every file of the final zip is the CPU build's or the ROCm build's, unchanged (Linux: skip) | yes |
+| T0.11 | the finished archive reads back intact and is the one the build job produced and the qualify jobs tested | yes |
 | T0.12 | the ROCm libraries the archive needs exist in the ROCm a user installs | yes |
 
 T0.10 and T0.11 come from `check_post_merge.py`, which runs later than the
 rest: the release job merges the Windows CPU backend into the Windows ROCm
 archives, and those two questions can only be answered after that has happened.
+The merge replaces every file the two zips share, including `llama-server.exe`,
+`llama.dll` and `ggml-base.dll`, so on Windows the other checks and Tier 1 ran
+on the ROCm build's copies of those files, not the ones that ship. T0.10 lists
+the replaced files. T0.11 compares the archive's SHA-256 with the one the build
+job recorded; on Windows it hashes a copy of the zip kept from before the merge.
 
 T0.9 is retired and its id is not reused. It compared the tag in the archive's
 name with the folder inside it, but ran before the release job adds the tag to

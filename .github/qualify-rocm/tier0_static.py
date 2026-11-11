@@ -15,9 +15,7 @@ Checks:
   T0.3  gfx target audit           -- the GPU backend really contains code for
                                       every gfx target the build asked for.
                                       See binfmt.py for how and why.
-  T0.4  CPU backend variants       -- ggml-cpu-* present. On Windows after the
-                                      release job's CPU merge this is also the
-                                      proof that the merge landed.
+  T0.4  CPU backend variants       -- ggml-cpu-* present.
   T0.5  runtime dependency survey  -- every non-ROCm dependency resolves from
                                       the archive or the base system; the ROCm
                                       ones are recorded as expected-external.
