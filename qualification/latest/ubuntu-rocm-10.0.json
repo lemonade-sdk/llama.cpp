@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-10T15:52:15Z",
+  "generated_at": "2026-11-11T00:51:17Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@42812595764",
-    "artifact": "llama-b12264-bin-ubuntu-rocm-10.0-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.0-x64.tar.gz@42928883857",
+    "artifact": "llama-b12282-bin-ubuntu-rocm-10.0-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.0",
-    "llamacpp_tag": "b12264",
-    "upstream_sha": "4ed88da2ea2a51edc158efe0ee2a1e452d75644d",
+    "llamacpp_tag": "b12282",
+    "upstream_sha": "aa75ff3239f9cc675b081697deda9e1b112345c6",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "42812595764",
+    "run_id": "42928883857",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -74,7 +74,7 @@
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 289631164
+            "bytes": 289722496
           }
         },
         {
@@ -103,7 +103,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1423526144
+            "bytes": 1423526664
           }
         },
         {
@@ -112,11 +112,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 18703,
+          "duration_ms": 18718,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1423526144,
+            "bytes_scanned": 1423526664,
             "bundle_magic_count": 141,
             "expected_count": 27,
             "present_count": 27,
@@ -348,7 +348,7 @@
           "error": null,
           "details": {
             "returncode": 0,
-            "help_bytes": 61840,
+            "help_bytes": 62036,
             "flags_checked": 12,
             "flags_missing": []
           }
@@ -363,9 +363,9 @@
           "error": "no tag to compare (flat archive layout)",
           "details": {
             "asset_tag": null,
-            "inner_dir_tag": "b12264",
+            "inner_dir_tag": "b12282",
             "top_level": [
-              "llama-b12264"
+              "llama-b12282"
             ]
           }
         },
@@ -427,7 +427,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 1,
+          "duration_ms": 2,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -448,7 +448,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 743,
+          "duration_ms": 788,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -465,7 +465,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 660,
+          "duration_ms": 693,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
