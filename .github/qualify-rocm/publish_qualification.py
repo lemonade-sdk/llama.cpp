@@ -92,14 +92,6 @@ def _int(value):
         return None
 
 
-def _test_order(test_id):
-    """Sort "T0.10" after "T0.9", and unknown ids after known ones."""
-    match = re.match(r"^T(\d+)\.(\d+)$", test_id or "")
-    if match:
-        return (int(match.group(1)), int(match.group(2)), "")
-    return (sys.maxsize, sys.maxsize, test_id or "")
-
-
 def _run_order(run_id):
     """GitHub run ids only grow, so they order runs by when they started.
 
@@ -196,12 +188,12 @@ def collect_results(record, post_merge_checked):
     results = {test_id: by_id[test_id]["status"] if test_id in by_id
                else absent_status(record, test_id, post_merge_checked)
                for ids in TIER_TESTS.values() for test_id in ids}
-    for test_id in sorted((t for t in by_id if t not in results), key=_test_order):
+    for test_id in sorted((t for t in by_id if t not in results), key=report.test_order):
         results[test_id] = by_id[test_id]["status"]
 
     blocking = sorted((test_id for test_id, test in by_id.items()
                        if test.get("gating") and test.get("status") == "fail"),
-                      key=_test_order)
+                      key=report.test_order)
     return results, blocking
 
 
