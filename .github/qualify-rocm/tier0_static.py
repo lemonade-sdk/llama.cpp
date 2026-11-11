@@ -186,9 +186,9 @@ def check_contents(root, os_name):
     if "LICENSE" not in files:
         missing.append("LICENSE")
 
-    # The windows-rocm build job is the only one that does not pass the shared
-    # CMAKE_ARGS (which carry -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF),
-    # so its zip ships the upstream unit-test binaries to end users.
+    # Every build job passes the shared CMAKE_ARGS, whose -DLLAMA_BUILD_TESTS=OFF
+    # keeps upstream's unit-test binaries out of the archive.
+    # Any test-* file here means the build did not receive -DLLAMA_BUILD_TESTS=OFF.
     tests = sorted(f for f in files if f.startswith("test-"))
     details = {"entries": len(files), "missing": missing,
                "test_binaries_shipped": len(tests), "test_binaries": tests[:10]}
@@ -198,7 +198,7 @@ def check_contents(root, os_name):
     if tests:
         return (report.STATUS_WARN,
                 f"{len(tests)} upstream test binary/binaries shipped to users "
-                "(this job does not pass -DLLAMA_BUILD_TESTS=OFF)", details)
+                "(the build job did not pass -DLLAMA_BUILD_TESTS=OFF)", details)
     return (report.STATUS_PASS, None, details)
 
 
