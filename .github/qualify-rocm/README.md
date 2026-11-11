@@ -143,13 +143,19 @@ load_tensors: offloaded 29/29 layers to GPU
 
 This comes from what `-ngl` *asked for*, and the line appears word for word on a machine with no GPU at all — where the very next lines then report every buffer as `CPU`. A check that accepted it would pass on exactly the silent fallback it exists to catch.
 
-So T1.2 requires evidence that names a ROCm device, which cannot appear unless
-one was found and used:
+So T1.2 requires both of these lines, each naming a ROCm device, which cannot
+appear unless one was found and used:
 
 ```
 llama_prepare_model_devices: using device ROCm0 (...) - 12345 MiB free
 load_tensors:        ROCm0 model buffer size =   357.09 MiB
 ```
+
+The device line alone is not enough: it is printed for every device llama.cpp
+selects, before it decides where the model's layers go. The model buffer must be
+larger than 0.00 MiB, because llama.cpp's memory-fit dry run, which allocates
+nothing, reports a 0.00 MiB buffer when logging is verbose enough to show it
+(`-lv 5` or higher). This is the same rule lemonade-sdk/llamacpp-rocm uses.
 
 The `offloaded N/N` line is still recorded, as context for whoever reads the
 report, but it never decides the outcome.

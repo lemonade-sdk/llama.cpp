@@ -67,13 +67,17 @@ REQUEST_TIMEOUT = 180
 SERVER_ARGS = ["--ctx-size", "4096", "--jinja", "--metrics", "-lv", "4"]
 
 # Evidence that the GPU genuinely did the work. Both name a ROCm device, so
-# neither can appear unless a ROCm device was found and used:
+# neither can appear unless one was found, and BOTH are required:
 #   "llama_prepare_model_devices: using device ROCm0 (...) - 12345 MiB free"
 #   "load_tensors:        ROCm0 model buffer size =  357.09 MiB"
-GPU_PROOF_PATTERNS = [
-    re.compile(r"using device (ROCm\d+)"),
-    re.compile(r"(ROCm\d+)[^\n]*buffer size"),
-]
+# The device line alone is not enough: llama.cpp prints it for every device it
+# selects, before deciding which layers go where. Only the model (weights)
+# buffer counts, and its size must be above zero: llama.cpp's memory-fit dry
+# run, which allocates nothing, reports "ROCm0 model buffer size = 0.00 MiB"
+# when logging is verbose enough to show it (-lv 5 or higher).
+# Same rule as lemonade-sdk/llamacpp-rocm's T1.2.
+DEVICE_RE = re.compile(r"using device (ROCm\d+)(?: \((.*?)\)(?= \(| -|$))?", re.M)
+BUFFER_RE = re.compile(r"(ROCm\d+) model buffer size\s*=\s*([0-9.]+) MiB")
 
 # Deliberately NOT treated as proof, despite how it reads.
 # llama.cpp prints "offloaded 29/29 layers to GPU" from the number of layers
@@ -87,6 +91,7 @@ REQUESTED_OFFLOAD_RE = re.compile(r"offloaded\s+(\d+)/(\d+)\s+layers to GPU")
 # something more useful than "no evidence found".
 CPU_FALLBACK_HINTS = [
     re.compile(r"failed to load .*ggml-hip", re.I),
+    re.compile(r"failed to initialize ROCm", re.I),
     re.compile(r"no usable GPU", re.I),
     re.compile(r"offloaded\s+0/\d+\s+layers to GPU"),
 ]
@@ -287,15 +292,19 @@ def check_gpu_offload(server, base):
     """
     log = server.log_text()
 
-    proof = []
-    for pattern in GPU_PROOF_PATTERNS:
-        for match in pattern.finditer(log):
-            line = match.group(0).strip()
-            if line not in proof:
-                proof.append(line)
-
+    devices = []
+    for match in DEVICE_RE.finditer(log):
+        entry = {"device": match.group(1), "name": match.group(2)}
+        if entry not in devices:
+            devices.append(entry)
+    buffers = [(m.group(1), float(m.group(2))) for m in BUFFER_RE.finditer(log)]
+    allocated = [(dev, mib) for dev, mib in buffers if mib > 0]
     requested = REQUESTED_OFFLOAD_RE.search(log)
-    devices = re.findall(r"^\s*-\s+(\S+)\s*:.*MiB", log, re.MULTILINE)
+
+    # The evidence as readable lines, sizes included, for whoever reads the report.
+    proof = [f"using device {e['device']}" + (f" ({e['name']})" if e["name"] else "")
+             for e in devices]
+    proof += [f"{dev} model buffer size = {mib:.2f} MiB" for dev, mib in allocated]
 
     props_status, props_raw = http_get(f"{base}/props")
     props = {}
@@ -307,9 +316,10 @@ def check_gpu_offload(server, base):
 
     details = {
         "gpu_proof": proof[:10],
+        "devices_selected": devices,
+        "model_buffers_mib": buffers,
         # Recorded, never decisive -- see REQUESTED_OFFLOAD_RE above.
         "requested_offload_line": requested.group(0) if requested else None,
-        "devices_reported": sorted(set(devices)),
         # /props is supplementary: its shape changes between upstream releases,
         # so it is recorded but never gates.
         "props_status": props_status,
@@ -317,7 +327,7 @@ def check_gpu_offload(server, base):
         .get("n_gpu_layers"),
     }
 
-    if proof:
+    if devices and allocated:
         print("GPU confirmed by:")
         for line in proof[:10]:
             print(f"    {line}")
@@ -329,6 +339,9 @@ def check_gpu_offload(server, base):
 
     if hints:
         reason = "the GPU backend did not load, so llama.cpp used the CPU"
+    elif devices and not allocated:
+        reason = ("a ROCm device was selected but no model memory was ever placed "
+                  "on it")
     elif requested:
         reason = (f"the only offload line present, '{requested.group(0)}', reports "
                   "what -ngl asked for rather than what happened; no ROCm device "
