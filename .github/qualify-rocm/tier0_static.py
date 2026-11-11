@@ -30,14 +30,15 @@ Checks:
                                       launches with, and the one Tier 1 relies
                                       on, are all still accepted (needs
                                       --run-binaries).
-  T0.9  archive tag consistency    -- the directory inside the tarball matches
-                                      the tag in the asset filename.
   T0.12 ROCm dependency resolution -- the ROCm libraries this archive needs
                                       exist in the ROCm a user will install
                                       (needs --rocm-dirs).
 
 (T0.10 and T0.11 are emitted separately by check_post_merge.py, which runs on
-the final archives after the release job assembles them.)
+the final archives after the release job assembles them. T0.9 is retired: it
+compared the tag in the archive's name with its inner folder, but ran before
+the release job adds the tag to the name, so it never compared anything. Its
+id is not reused.)
 
 Usage:
     python3 tier0_static.py --archive llama-bin-ubuntu-rocm-10.1-x64.tar.gz \
@@ -547,36 +548,6 @@ def check_server_flags(root, os_name, run_binaries):
     return (report.STATUS_PASS, None, details)
 
 
-def check_tag_consistency(archive, tops):
-    """The folder inside the archive should match the tag in its name.
-
-    Every job in a release resolves its upstream revision from a single shared
-    value, so these two should always agree. If they ever stop agreeing, jobs
-    have gone back to resolving it independently -- which means they may also
-    have compiled different source, and the archive's name no longer tells you
-    what is inside it.
-
-    Non-gating: a mismatch does not make the binaries wrong, it makes their
-    provenance unclear.
-    """
-    asset = re.search(r"llama-(b\d+)-", os.path.basename(archive))
-    inner = None
-    for top in tops:
-        match = re.fullmatch(r"llama-(b\d+)", top)
-        if match:
-            inner = match.group(1)
-            break
-    details = {"asset_tag": asset.group(1) if asset else None,
-               "inner_dir_tag": inner, "top_level": tops}
-    if not asset or inner is None:
-        return (report.STATUS_SKIP, "no tag to compare (flat archive layout)", details)
-    if asset.group(1) != inner:
-        return (report.STATUS_WARN,
-                f"asset is named {asset.group(1)} but contains {inner}/ -- the jobs "
-                "in this run did not all build the same upstream revision", details)
-    return (report.STATUS_PASS, None, details)
-
-
 def main():
     parser = argparse.ArgumentParser(description="Tier 0 static archive verification")
     parser.add_argument("--meta", default=None,
@@ -643,7 +614,7 @@ def main():
 
     workdir = tempfile.mkdtemp(prefix="tier0-")
     try:
-        root, tops = extract(args.archive, workdir)
+        root, _ = extract(args.archive, workdir)
         print(f"Extracted {args.archive} -> {root} ({len(listing(root))} entries)")
 
         tier.run("T0.1", "archive contents",
@@ -662,9 +633,6 @@ def main():
                  lambda: check_rpath(root, args.os_name))
         tier.run("T0.8", "llama-server flag surface",
                  lambda: check_server_flags(root, args.os_name, args.run_binaries))
-        tier.run("T0.9", "archive tag consistency",
-                 lambda: check_tag_consistency(args.archive, tops),
-                 gating=False)
         tier.run("T0.12", "ROCm dependency resolution",
                  lambda: check_rocm_dependencies(root, args.os_name, rocm_dirs))
     finally:

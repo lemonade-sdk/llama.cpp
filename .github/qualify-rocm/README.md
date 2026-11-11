@@ -60,7 +60,6 @@ been packaged.
 | T0.6 | the archive still runs on the oldest Linux release we support | yes |
 | T0.7 | no build-machine paths left inside the binaries | yes |
 | T0.8 | `llama-server` still accepts the flags it is launched with | yes |
-| T0.9 | the folder inside the archive matches the archive's own name | no |
 | T0.10 | the Windows CPU backend merge landed | yes |
 | T0.11 | the finished archive still opens and is complete | yes |
 | T0.12 | the ROCm libraries the archive needs exist in the ROCm a user installs | yes |
@@ -68,6 +67,10 @@ been packaged.
 T0.10 and T0.11 come from `check_post_merge.py`, which runs later than the
 rest: the release job merges the Windows CPU backend into the Windows ROCm
 archives, and those two questions can only be answered after that has happened.
+
+T0.9 is retired and its id is not reused. It compared the tag in the archive's
+name with the folder inside it, but ran before the release job adds the tag to
+the name, so it never compared anything.
 
 ### Tier 1 — `tier1_gpu.py`
 

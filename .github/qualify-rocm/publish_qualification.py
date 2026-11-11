@@ -51,7 +51,7 @@ SCHEMA_VERSION = 2
 # A test id not listed here is still published, never dropped.
 TIER_TESTS = {
     "tier0": ["T0.1", "T0.2", "T0.3", "T0.4", "T0.5", "T0.6",
-              "T0.7", "T0.8", "T0.9", "T0.10", "T0.11", "T0.12"],
+              "T0.7", "T0.8", "T0.10", "T0.11", "T0.12"],
     "tier1": ["T1.1", "T1.2", "T1.3", "T1.4", "T1.5"],
 }
 # Run by the release job on the archives still in the release after its completeness check.

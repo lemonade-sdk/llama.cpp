@@ -111,7 +111,7 @@ Not in the feed:
       "run_url": "https://github.com/lemonade-sdk/llama.cpp/actions/runs/41550569320",
       "event": "schedule",
       "build_result": "fail",                   // the windows-rocm (10.1.0) job failed
-      "tests": { "passed": 0, "failed": 0, "warned": 0, "skipped": 0, "missing": 15, "not_applicable": 2, "total": 17 },
+      "tests": { "passed": 0, "failed": 0, "warned": 0, "skipped": 0, "missing": 14, "not_applicable": 2, "total": 16 },
       "qualified": false,
       "version_qualified": false,
       "published": false,
@@ -123,7 +123,7 @@ Not in the feed:
       "results": {
         "T0.1": "missing", "T0.2": "missing", "T0.3": "missing", "T0.4": "missing",
         "T0.5": "missing", "T0.6": "missing", "T0.7": "missing", "T0.8": "missing",
-        "T0.9": "missing", "T0.10": "not_applicable", "T0.11": "not_applicable", "T0.12": "missing",
+        "T0.10": "not_applicable", "T0.11": "not_applicable", "T0.12": "missing",
         "T1.1": "missing", "T1.2": "missing", "T1.3": "missing", "T1.4": "missing", "T1.5": "missing"
       },
       "report_url": "reports/41550569320-win-rocm-10.1.json"
@@ -147,7 +147,7 @@ Not in the feed:
       "run_url": "https://github.com/lemonade-sdk/llama.cpp/actions/runs/41550569320",
       "event": "schedule",
       "build_result": "pass",
-      "tests": { "passed": 14, "failed": 0, "warned": 0, "skipped": 1, "missing": 0, "not_applicable": 2, "total": 17 },
+      "tests": { "passed": 14, "failed": 0, "warned": 0, "skipped": 0, "missing": 0, "not_applicable": 2, "total": 16 },
       "qualified": true,                        // this archive passed its own checks
       "version_qualified": false,               // its Windows counterpart has no record
       "published": false,                       // so ROCm 10.1 was withheld from b12062
@@ -159,7 +159,7 @@ Not in the feed:
       "results": {
         "T0.1": "pass", "T0.2": "pass", "T0.3": "pass", "T0.4": "pass",
         "T0.5": "pass", "T0.6": "pass", "T0.7": "pass", "T0.8": "pass",
-        "T0.9": "skip", "T0.10": "not_applicable", "T0.11": "not_applicable",   // dropped before the post-merge checks
+        "T0.10": "not_applicable", "T0.11": "not_applicable",   // dropped before the post-merge checks
         "T0.12": "pass",
         "T1.1": "pass", "T1.2": "pass", "T1.3": "pass", "T1.4": "pass", "T1.5": "pass"
       },
@@ -185,7 +185,7 @@ Not in the feed:
       "run_url": "https://github.com/lemonade-sdk/llama.cpp/actions/runs/40977810710",
       "event": "schedule",                      // schedule | workflow_dispatch
       "build_result": "pass",                   // pass | fail | cancelled | skipped | unknown
-      "tests": { "passed": 13, "failed": 0, "warned": 1, "skipped": 3, "missing": 0, "not_applicable": 0, "total": 17 },
+      "tests": { "passed": 13, "failed": 0, "warned": 1, "skipped": 2, "missing": 0, "not_applicable": 0, "total": 16 },
       "qualified": true,                        // passed every gating check required of it: Tier 0, plus
                                                 // Tier 1 if it ran. Not whether it shipped.
       "version_qualified": true,                // both archives of ROCm 10.1 exist and qualified
@@ -198,7 +198,7 @@ Not in the feed:
       "results": {
         "T0.1": "warn", "T0.2": "pass", "T0.3": "pass", "T0.4": "pass",
         "T0.5": "pass", "T0.6": "skip", "T0.7": "skip", "T0.8": "pass",
-        "T0.9": "skip", "T0.10": "pass", "T0.11": "pass", "T0.12": "pass",
+        "T0.10": "pass", "T0.11": "pass", "T0.12": "pass",
         "T1.1": "pass", "T1.2": "pass", "T1.3": "pass", "T1.4": "pass", "T1.5": "pass"
       },
       "report_url": "reports/40977810710-win-rocm-10.1.json"
@@ -209,13 +209,15 @@ Not in the feed:
 
 ### Field notes
 
-- **`results`** has one entry per test: T0.1–T0.12 and T1.1–T1.5, as listed in
-  [README.md](README.md). A test id added to the suite later appears here as
-  soon as it runs, so the failure-frequency and heatmap views can be built from
-  `index.json` alone. The values:
+- **`results`** has one entry per test: T0.1–T0.8, T0.10–T0.12 and T1.1–T1.5,
+  as listed in [README.md](README.md). A test id added to the suite later
+  appears here as soon as it runs, so the failure-frequency and heatmap views
+  can be built from `index.json` alone. A retired test stops appearing in new
+  rows and keeps its value in older ones: rows published before T0.9 was
+  retired also carry T0.9. The values:
   - `pass`: the check ran and passed.
   - `fail`: the check ran and found a problem. It blocks the archive only if
-    the test is gating; T0.9, T1.4 and T1.5 never block.
+    the test is gating; T1.4 and T1.5 never block.
   - `warn`: the check ran and found something worth recording that does not
     block, e.g. upstream test programs shipped in the archive (T0.1).
   - `skip`: the check ran but could not apply, e.g. T0.6 and T0.7 on Windows
@@ -355,7 +357,7 @@ Everything else in the row means the same.
 | `tier1` | Tier 1 runs on every archive; `missing` does not block | Tier 1 runs only on gfx1151 (`not_applicable` elsewhere); `missing` blocks |
 | `not_applicable` | T0.10, T0.11 on an archive dropped before the release checks | T1.x outside gfx1151; T0.11 on a run with no release |
 | `blocked_by` | no `tier1 missing`, no `T0.11 missing` | also `tier1 missing`, `T0.11 missing` |
-| `results` keys | T0.1–T0.12, T1.1–T1.5 | T0.1–T0.3, T0.5–T0.9, T0.11, T0.13, T1.1–T1.6 |
+| `results` keys | T0.1–T0.8, T0.10–T0.12, T1.1–T1.5 (older rows also T0.9) | T0.1–T0.3, T0.5–T0.9, T0.11, T0.13, T1.1–T1.6 |
 | placeholder `gfx` | all zero | requested targets, all in `missing` |
 | `latest/` file | `<os>-rocm-<rocm_version>.json` | `<os>-rocm-<gfx_family>.json` |
 
