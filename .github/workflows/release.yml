@@ -1105,6 +1105,7 @@ jobs:
           mkdir build
           cd build
           # CMAKE_ARGS keeps upstream's tests and examples out of the zip, as on every other build job (T0.1 warns if tests ship).
+          # BoringSSL gives this job's llama-server HTTPS (-hf, --model-url), as windows-cpu has. The release job ships this zip unmerged, so these are the binaries users get.
           cmake .. `
             -G "Unix Makefiles" `
             -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
@@ -1119,6 +1120,7 @@ jobs:
             -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
             -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
             -DHIP_PATH="${env:HIP_PATH}" `
+            -DLLAMA_BUILD_BORINGSSL=ON `
             -DAMDGPU_TARGETS="${{ matrix.gpu_targets }}" `
             ${{ env.CMAKE_ARGS }}
           cmake --build . --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
@@ -1150,7 +1152,7 @@ jobs:
           cp "LICENSE" "build\bin\"
           7z a -snl llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip .\build\bin\*
 
-      # Same as ubuntu-24-rocm, SHA-256 included. The release job rewrites this zip when it merges the CPU backend in, so T0.11 compares the copy it keeps from before the merge.
+      # Same as ubuntu-24-rocm, SHA-256 included.
       - name: Record qualification metadata
         run: |
           $archive = 'llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ matrix.build }}.zip'
@@ -1567,7 +1569,7 @@ jobs:
       - qualify-tier0
       - qualify-tier1
 
-    # For publish-qualification: which ROCm archives the post-merge checks ran on, and which this run uploaded.
+    # For publish-qualification: which ROCm archives the final-archive check (T0.11) ran on, and which this run uploaded.
     outputs:
       post_merge_checked: ${{ steps.post_merge.outputs.archives }}
       published_rocm: ${{ steps.published_rocm.outputs.archives }}
@@ -1632,53 +1634,18 @@ jobs:
         run: |
           mkdir -p release
 
-          # Windows CPU is a hard prerequisite for every Windows zip-based
-          # artifact (its binaries get merged into e.g. the ROCm zip below),
-          # not just its own "cpu" family. If it's missing, none of those
-          # zips can be completed, so skip moving any of them into release/
-          # rather than hard-failing the whole job — Ubuntu/CUDA artifacts
-          # below are unaffected, and the completeness check further down
-          # will see the missing files and drop the cpu/rocm families.
-          echo "Adding CPU backend files to Windows ZIP archives..."
-          cpu_zip_available=true
-          for arch in x64; do
-            cpu_zip="artifact/llama-bin-win-cpu-${arch}.zip"
-            if [ ! -f "$cpu_zip" ]; then
-              echo "::warning::Missing CPU artifact $cpu_zip — Windows zip-based artifacts (cpu, rocm) cannot be completed and will be dropped by the completeness check below."
-              cpu_zip_available=false
-              continue
-            fi
-            temp_dir=$(mktemp -d)
-            echo "Extracting CPU backend for $arch..."
-            unzip "$cpu_zip" -d "$temp_dir"
-
-            echo "Adding CPU files to $arch zips..."
-            mkdir -p premerge
-            for target_zip in artifact/llama-bin-win-*-${arch}.zip; do
-              if [[ "$target_zip" == "$cpu_zip" ]]; then
-                continue
-              fi
-              # The merge rewrites the zip in place. Keep the bytes the qualify jobs tested so the post-merge checks (T0.10, T0.11) can compare against them.
-              cp "$target_zip" premerge/
-              echo "Adding CPU backend to $(basename "$target_zip")"
-              realpath_target_zip=$(realpath "$target_zip")
-              (cd "$temp_dir" && zip -r "$realpath_target_zip" .)
-            done
-
-            rm -rf "$temp_dir"
+          # Windows zips ship exactly as their build jobs made them. Upstream merges the CPU zip into
+          # its HIP zip because its HIP job builds only ggml-hip; windows-rocm here builds the whole
+          # tree, CPU backends and llama-server included, so a merge would only replace the files
+          # the qualify jobs tested with ones they never ran.
+          echo "Renaming and moving zips to release..."
+          for zip_file in artifact/llama-bin-win-*.zip; do
+            [ -f "$zip_file" ] || continue
+            base_name=$(basename "$zip_file" .zip)
+            zip_name="llama-${{ steps.tag.outputs.name }}-${base_name#llama-}.zip"
+            echo "Moving $zip_file to release/$zip_name"
+            mv "$zip_file" "release/$zip_name"
           done
-
-          if [ "$cpu_zip_available" = true ]; then
-            echo "Renaming and moving zips to release..."
-            for zip_file in artifact/llama-bin-win-*.zip; do
-              base_name=$(basename "$zip_file" .zip)
-              zip_name="llama-${{ steps.tag.outputs.name }}-${base_name#llama-}.zip"
-              echo "Moving $zip_file to release/$zip_name"
-              mv "$zip_file" "release/$zip_name"
-            done
-          else
-            echo "Skipping Windows zip artifacts (cpu, rocm) — CPU backend was unavailable to merge into them."
-          fi
 
           echo "Renaming and moving tar.gz files to release..."
           for tar_file in artifact/*.tar.gz; do
@@ -1818,7 +1785,7 @@ jobs:
           path: ./meta
           merge-multiple: true
 
-      - name: Post-merge checks on final artifacts
+      - name: Final-archive checks
         id: post_merge
         env:
           TAG: ${{ steps.tag.outputs.name }}
@@ -1832,18 +1799,13 @@ jobs:
             checked="${checked:+$checked }$base"
             if [[ "$base" == *-win-rocm-* ]]; then os=win; else os=ubuntu; fi
             ver=$(sed -E 's/.*-rocm-([0-9]+\.[0-9]+)-x64\..*/\1/' <<<"$base")
-            merge_args=()
-            if [ "$os" = win ]; then
-              merge_args=(--cpu-zip "release/llama-${TAG}-bin-win-cpu-x64.zip"
-                          --pre-merge "premerge/llama-bin-win-rocm-$ver-x64.zip")
-            fi
-            echo "::group::Post-merge — $base"
-            # Every check records its own failure, so a crash here is a bug in the script; report it without stopping the release.
+            echo "::group::Final archive — $base"
+            # The check records its own failure, so a crash here is a bug in the script; report it without stopping the release.
             python3 lemonade-ci/.github/qualify-rocm/check_post_merge.py \
               --archive "$archive" --os "$os" --rocm-version "$ver" --tag "$TAG" \
-              --meta "meta/qualify-meta-$os-rocm-$ver.json" "${merge_args[@]}" \
+              --meta "meta/qualify-meta-$os-rocm-$ver.json" \
               --output "fragments/tier0-postmerge-$os-rocm-$ver.json" \
-              || echo "::error::check_post_merge.py crashed on $base, so T0.10 and T0.11 will show as missing"
+              || echo "::error::check_post_merge.py crashed on $base, so T0.11 will show as missing"
             echo "::endgroup::"
           done
           echo "archives=$checked" >> "$GITHUB_OUTPUT"
