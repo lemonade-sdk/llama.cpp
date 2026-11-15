@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-14T12:43:18Z",
+  "generated_at": "2026-11-15T02:13:25Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@43592956799",
-    "artifact": "llama-b12377-bin-ubuntu-rocm-7.14-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@43656680528",
+    "artifact": "llama-b12407-bin-ubuntu-rocm-7.14-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b12377",
-    "upstream_sha": "32bdc3a89e6528d3e419024c833c5dabf32c7541",
+    "llamacpp_tag": "b12407",
+    "upstream_sha": "e574a17b062be51b98e239ccd3d3743e3d902333",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "43592956799",
+    "run_id": "43656680528",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1488912864
+            "bytes": 1491724528
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 19542,
+          "duration_ms": 19575,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1488912864,
+            "bytes_scanned": 1491724528,
             "bundle_magic_count": 141,
             "expected_count": 27,
             "present_count": 27,
@@ -301,7 +301,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 16,
+          "duration_ms": 15,
           "error": null,
           "details": {
             "returncode": 0,
@@ -316,14 +316,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4443,
+          "duration_ms": 5633,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 305683191,
-            "sha256": "2ac2a604de918c66a4f1d624ed8f193bcd8932f851e7f2381bfa48d8dd5040b6",
-            "expected_sha256": "2ac2a604de918c66a4f1d624ed8f193bcd8932f851e7f2381bfa48d8dd5040b6"
+            "bytes": 307602702,
+            "sha256": "b293458ed2094065fdb067634eccde47d8f7b533669196aa43f4cc70f1b23328",
+            "expected_sha256": "b293458ed2094065fdb067634eccde47d8f7b533669196aa43f4cc70f1b23328"
           }
         },
         {
@@ -384,7 +384,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 2,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -414,7 +414,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 606,
+          "duration_ms": 771,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -431,7 +431,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 516,
+          "duration_ms": 659,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
