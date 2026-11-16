@@ -2010,13 +2010,19 @@ jobs:
               if (e.status !== 404) throw e;
               const body = fs.readFileSync('release-notes.md', 'utf8');
               try {
-                release = (await github.rest.repos.createRelease({ owner, repo, tag_name: tag, body })).data;
+                release = (await github.rest.repos.createRelease({ owner, repo, tag_name: tag, name: tag, body })).data;
                 core.info(`Created release ${tag} (id ${release.id})`);
               } catch (createError) {
                 if (createError.status !== 422) throw createError;
                 release = (await github.rest.repos.getReleaseByTag({ owner, repo, tag })).data;
                 core.info(`Reusing concurrently created release ${tag} (id ${release.id})`);
               }
+            }
+            // A release without a title is shown as the tag + the tagged commit's message, so title it with the tag.
+            // Covers releases created before titles were set, when a re-run or an unchanged upstream reuses them.
+            if (!release.name) {
+              release = (await github.rest.repos.updateRelease({ owner, repo, release_id: release.id, name: tag })).data;
+              core.info(`Titled release ${tag}`);
             }
             core.setOutput('id', release.id);
 
