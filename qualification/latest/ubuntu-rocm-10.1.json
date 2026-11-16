@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-16T00:51:01Z",
+  "generated_at": "2026-11-16T13:51:51Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@43778703967",
-    "artifact": "llama-b12429-bin-ubuntu-rocm-10.1-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@43863719872",
+    "artifact": "llama-b12440-bin-ubuntu-rocm-10.1-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12429",
-    "upstream_sha": "9fba51d2c9a1b5cb5f0c47986c031334e2d7663a",
+    "llamacpp_tag": "b12440",
+    "upstream_sha": "5cb95167983f7484febb0e97c7b00887e265ebcf",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "43778703967",
+    "run_id": "43863719872",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1637322888
+            "bytes": 1637478280
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 25565,
+          "duration_ms": 15480,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1637322888,
+            "bytes_scanned": 1637478280,
             "bundle_magic_count": 141,
             "expected_count": 29,
             "present_count": 29,
@@ -210,7 +210,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -228,7 +228,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 5,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -295,7 +295,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 2,
           "error": null,
           "details": {
             "leaked": {}
@@ -307,7 +307,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 18,
+          "duration_ms": 14,
           "error": null,
           "details": {
             "returncode": 0,
@@ -322,14 +322,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 5370,
+          "duration_ms": 7280,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 339376103,
-            "sha256": "7fe0efc367a17b3cfb3bac0ccce5fbe402b836f95bc828329fbce8acf09a3b95",
-            "expected_sha256": "7fe0efc367a17b3cfb3bac0ccce5fbe402b836f95bc828329fbce8acf09a3b95"
+            "bytes": 339471163,
+            "sha256": "a474771f7513ad80609572c541969bd3edb5378ad070b4691200bca85e68c96d",
+            "expected_sha256": "a474771f7513ad80609572c541969bd3edb5378ad070b4691200bca85e68c96d"
           }
         },
         {
@@ -338,7 +338,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "rocm_dirs_searched": 6,
@@ -390,7 +390,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 2,
+          "duration_ms": 1,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -420,7 +420,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 760,
+          "duration_ms": 753,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -437,7 +437,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 658,
+          "duration_ms": 665,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
