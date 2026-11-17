@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-16T13:51:51Z",
+  "generated_at": "2026-11-17T03:41:48Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@43863719872",
-    "artifact": "llama-b12440-bin-ubuntu-rocm-7.14-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@43985076195",
+    "artifact": "llama-b12463-bin-ubuntu-rocm-7.14-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b12440",
-    "upstream_sha": "5cb95167983f7484febb0e97c7b00887e265ebcf",
+    "llamacpp_tag": "b12463",
+    "upstream_sha": "9581154a2250cc9e6948e4c2a2fc4b4e19d1a57e",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "43863719872",
+    "run_id": "43985076195",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1491245856
+            "bytes": 1491246064
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 19624,
+          "duration_ms": 25628,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1491245856,
+            "bytes_scanned": 1491246064,
             "bundle_magic_count": 141,
             "expected_count": 27,
             "present_count": 27,
@@ -204,7 +204,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -222,7 +222,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 6,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -289,7 +289,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "leaked": {}
@@ -301,11 +301,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 15,
+          "duration_ms": 19,
           "error": null,
           "details": {
             "returncode": 0,
-            "help_bytes": 62870,
+            "help_bytes": 62893,
             "flags_checked": 12,
             "flags_missing": []
           }
@@ -316,14 +316,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 7092,
+          "duration_ms": 3823,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 307484165,
-            "sha256": "a1b1963c4865ba70076e6b348e9593af17249f2f3135572e829bc0146e1fdab7",
-            "expected_sha256": "a1b1963c4865ba70076e6b348e9593af17249f2f3135572e829bc0146e1fdab7"
+            "bytes": 307575302,
+            "sha256": "55b041e9b123e00455506ad8a0f02ad6957fb6efc1c0bc1d6a91de46333d1186",
+            "expected_sha256": "55b041e9b123e00455506ad8a0f02ad6957fb6efc1c0bc1d6a91de46333d1186"
           }
         },
         {
@@ -332,7 +332,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -414,7 +414,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 747,
+          "duration_ms": 748,
           "error": null,
           "details": {
             "finish_reason": "stop",
