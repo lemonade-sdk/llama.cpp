@@ -47,15 +47,15 @@ The dashboard's one regular fetch is `.../qualification/index.json`.
 
 ## One row per archive
 
-A release run builds six ROCm archives — Windows and Linux for each of ROCm
-7.14, 10.0 and 10.1 (`ROCM_VERSIONS` in `release.yml`) — and each is qualified
+A release run builds eight ROCm archives — Windows and Linux for each of ROCm
+7.14, 10.0, 10.1 and 10.2 (`ROCM_VERSIONS` in `release.yml`) — and each is qualified
 on its own. Each one gets its own row, because an archive is what a user
 downloads and what a bug report names. Rows from the same run share `run_id`;
 group on it to show a run as a whole.
 
 Every archive the run was meant to build gets a row, including one whose build
 failed (see [Placeholder rows](#placeholder-rows)). A run therefore always has
-six rows.
+eight rows.
 
 ## `build_id` and re-runs
 
@@ -175,7 +175,7 @@ Not in the feed:
       "upstream_sha": "36a0e2ffc0b352b774f8d71c43668b75b3061ef5",
       "artifact": "llama-b12003-bin-win-rocm-10.1-x64.zip",
       "os": "win",                              // win | ubuntu
-      "rocm_version": "10.1",                   // currently 7.14 | 10.0 | 10.1
+      "rocm_version": "10.1",                   // currently 7.14 | 10.0 | 10.1 | 10.2
       "gfx_target": "gfx1151",                  // the one gfx target Tier 1 ran on; null when Tier 1 did not run
       "hardware_validated": true,               // Tier 1 ran on a real GPU (see tier1 for how it went)
       "gfx": { "requested": 20, "present": 20, "missing": [] },
@@ -258,9 +258,8 @@ Not in the feed:
   release tag. Every row of a run has it, whether or not anything shipped.
 - **`build_result`** is how the archive's build job (`ubuntu-24-rocm` or
   `windows-rocm`) ended: `pass`, `fail` (including a timeout), `cancelled`,
-  `skipped`, or `unknown` when the run's job list could not be read. The three
-  `windows-rocm` builds stop together: when one fails, GitHub cancels the
-  others, so they show `cancelled`.
+  `skipped`, or `unknown` when the run's job list could not be read. Each
+  build ends on its own: one ROCm version failing does not cancel the others.
 - **`run_attempt`** is the attempt of the run that published the row. It is the
   same on every row of a run.
 - **`generated_at`** is when the row's record was written. A re-run writes it
@@ -345,11 +344,11 @@ Everything else in the row means the same.
 |---|---|---|
 | `schema_version` | `2` | `1` (same row shape) |
 | `build_id` | `<run_id>-<os>-rocm-<rocm_version>` | `<run_id>-<os>-rocm-<gfx_family>` |
-| rows per run | 6 | 20 |
+| rows per run | 8 | 20 |
 | `tag` | llama.cpp build number; set on every row | that repository's release tag; `null` unless `published` |
 | `artifact` | always the release name | the untagged CI name unless `published` |
 | `os` | `win` \| `ubuntu` | `windows` \| `ubuntu` |
-| `rocm_version` | `7.14` \| `10.0` \| `10.1`, one per archive | full nightly, e.g. `10.3.0a20261102`, same for the whole run |
+| `rocm_version` | `7.14` \| `10.0` \| `10.1` \| `10.2`, one per archive | full nightly, e.g. `10.3.0a20261102`, same for the whole run |
 | `gfx_family` | — | the GPU family the archive serves |
 | `version_qualified` | both archives of a ROCm version exist and qualified | not present (a release there is all or nothing) |
 | `tier1` | Tier 1 runs on every archive; `missing` does not block | Tier 1 runs only on gfx1151 (`not_applicable` elsewhere); `missing` blocks |
@@ -379,6 +378,6 @@ version 1 feed is not mixed with version 2 rows: the first version 2 publish
 starts a fresh `index.json`, `reports/` and `latest/`. The version 1 files stay
 in the branch's git history.
 
-`index.json` grows by six rows per run, roughly a dozen a day. That is
+`index.json` grows by eight rows per run, roughly sixteen a day. That is
 comfortable to poll for a long time, especially compressed. If it ever is not,
 older rows will move into per-month files under a new `schema_version`.
