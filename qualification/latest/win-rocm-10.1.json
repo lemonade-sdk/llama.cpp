@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-18T14:13:43Z",
+  "generated_at": "2026-11-19T03:31:18Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-10.1-x64.zip@44300371800",
-    "artifact": "llama-b12513-bin-win-rocm-10.1-x64.zip",
+    "build_id": "llama-bin-win-rocm-10.1-x64.zip@44426466073",
+    "artifact": "llama-b12529-bin-win-rocm-10.1-x64.zip",
     "os": "win",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12513",
-    "upstream_sha": "97069ff6c4a307cdcb02bd8952a8b5808d405bdb",
+    "llamacpp_tag": "b12529",
+    "upstream_sha": "0a76757469ea94ad5f88d14e18cc7370b9931f99",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "44300371800",
+    "run_id": "44426466073",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1403386880
+            "bytes": 1403849728
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 12828,
+          "duration_ms": 23078,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1403386880,
+            "bytes_scanned": 1403849728,
             "bundle_magic_count": 141,
             "expected_count": 22,
             "present_count": 22,
@@ -226,7 +226,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 32,
+          "duration_ms": 31,
           "error": null,
           "details": {
             "returncode": 0,
@@ -241,14 +241,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3470,
+          "duration_ms": 2925,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 273006634,
-            "sha256": "dfa3e7f9e6b7a97c699ff3c5fd25129bf2687a1cf56cc29f54a9132b3610bdf0",
-            "expected_sha256": "dfa3e7f9e6b7a97c699ff3c5fd25129bf2687a1cf56cc29f54a9132b3610bdf0"
+            "bytes": 273072977,
+            "sha256": "783037263022b248fea2e79971f5f632777aa32b7b411049840b80278b9276ae",
+            "expected_sha256": "783037263022b248fea2e79971f5f632777aa32b7b411049840b80278b9276ae"
           }
         },
         {
@@ -257,7 +257,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 375,
+          "duration_ms": 390,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -308,7 +308,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 15,
+          "duration_ms": 16,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -338,7 +338,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 905,
+          "duration_ms": 968,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -355,7 +355,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 469,
+          "duration_ms": 500,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
