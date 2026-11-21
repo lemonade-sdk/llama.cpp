@@ -32,7 +32,7 @@ other backend untouched.
 Usage:
     python3 aggregate.py --fragments-dir ./fragments --tag bNNNNN \
         --records-dir ./qualification --output-summary summary.json \
-        --operating-systems ubuntu,win --rocm-versions 7.14,10.0,10.1 \
+        --operating-systems ubuntu,win --rocm-versions 7.14,10.0,10.1,10.2 \
         --fail-on-no-promote
 """
 
@@ -172,7 +172,7 @@ def main():
     parser.add_argument("--operating-systems", default=None,
                         help="the operating systems every ROCm version is built for, e.g. ubuntu,win")
     parser.add_argument("--rocm-versions", default=None,
-                        help="the ROCm versions this run builds, e.g. 7.14,10.0,10.1")
+                        help="the ROCm versions this run builds, e.g. 7.14,10.0,10.1,10.2")
     parser.add_argument("--fail-on-no-promote", action="store_true")
     args = parser.parse_args()
 

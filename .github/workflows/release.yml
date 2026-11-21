@@ -27,7 +27,7 @@ env:
   # The ROCm archives every run should produce: each version, for each operating system.
   # The qualification records and the feed use these to notice an archive that never got built.
   # Keep in step with the ubuntu-24-rocm / windows-rocm matrices and the "Check release artifacts" step.
-  ROCM_VERSIONS: "7.14,10.0,10.1"
+  ROCM_VERSIONS: "7.14,10.0,10.1,10.2"
   ROCM_OPERATING_SYSTEMS: "ubuntu,win"
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
   # Device code for all currently shipped CUDA sm_* variants, once per platform.
@@ -172,6 +172,10 @@ jobs:
             gpu_targets: "gfx900;gfx906;gfx908;gfx90a;gfx90c;gfx942;gfx950;gfx1010;gfx1011;gfx1012;gfx1030;gfx1031;gfx1032;gfx1033;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151;gfx1152;gfx1153;gfx1170;gfx1171;gfx1200;gfx1201"
             build: x64
             repo: https://stable.repo.amd.com/rocm/whl-next
+          - ROCM_VERSION: "10.2.0"
+            gpu_targets: "gfx900;gfx906;gfx908;gfx90a;gfx90c;gfx942;gfx950;gfx1010;gfx1011;gfx1012;gfx1030;gfx1031;gfx1032;gfx1033;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151;gfx1152;gfx1153;gfx1170;gfx1171;gfx1200;gfx1201"
+            build: x64
+            repo: https://stable.repo.amd.com/rocm/whl-next
 
     steps:
       - name: Clone
@@ -187,7 +191,7 @@ jobs:
         with:
           key: ubuntu-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
-          # A ROCm build compiles every TU for 23-27 gfx targets, so the object
+          # A ROCm build compiles every TU for 27-29 gfx targets, so the object
           # set is several times larger than the action's 500MB default. At 500MB
           # ccache evicts (Cleanups) mid-build and never stays warm across runs,
           # turning a ~15min cached build into 2h+. 2G holds the full set.
@@ -322,6 +326,7 @@ jobs:
   ubuntu-22-cuda:
     needs: resolve-upstream
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -357,15 +362,10 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          # Install only the components this build consumes, rather than the
-          # cuda-toolkit-13-2 metapackage and its unrelated CUDA tools.
-          #   cuda-nvcc          compiler (pulls cuda-crt and cuda-nvvm)
-          #   cuda-cudart-dev    libcudart and the libcuda.so stub
-          #   cuda-cccl          Thrust/CUB headers
-          #   libcublas-dev      libcublas and libcublasLt
-          #   libcurand-dev      bundled and checked during validation
-          #   libnvjitlink-dev   bundled and checked during validation
-          # The versioned toolkit path is /usr/local/cuda-13.2.
+
+          # Install only the CUDA 13.2 components required by this build.
+          # NVML headers are needed at compile time; the driver library
+          # is loaded dynamically and does not need to be bundled.
           sudo apt-get install -y \
             cuda-nvcc-13-2 \
             cuda-cudart-dev-13-2 \
@@ -373,14 +373,14 @@ jobs:
             libcublas-dev-13-2 \
             libcurand-dev-13-2 \
             libnvjitlink-dev-13-2 \
+            cuda-nvml-dev-13-2 \
             cmake ninja-build patchelf
 
-          # Fail here, with the name of the missing file, rather than partway
-          # through the compile if NVIDIA ever repackages one of these out from
-          # under the hand-picked list above.
+          # Fail early if any required CUDA component is missing.
           for f in /usr/local/cuda-13.2/bin/nvcc \
                    /usr/local/cuda-13.2/include/cublas_v2.h \
                    /usr/local/cuda-13.2/include/cccl/cub/cub.cuh \
+                   /usr/local/cuda-13.2/include/nvml.h \
                    /usr/local/cuda-13.2/lib64/libcudart.so \
                    /usr/local/cuda-13.2/lib64/libcublas.so \
                    /usr/local/cuda-13.2/lib64/libcublasLt.so \
@@ -394,7 +394,6 @@ jobs:
           echo "CUDA_PATH=/usr/local/cuda-13.2" >> "$GITHUB_ENV"
           echo "/usr/local/cuda-13.2/bin" >> "$GITHUB_PATH"
           echo "LD_LIBRARY_PATH=/usr/local/cuda-13.2/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-
       - name: Build
         run: |
           cmake_arch="${{ matrix.sm }}"
@@ -529,6 +528,7 @@ jobs:
   ubuntu-22-cuda-arm64:
     needs: resolve-upstream
     runs-on: ubuntu-22.04-arm
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -564,7 +564,10 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          # As on x86_64, install only the CUDA components needed by this build.
+
+          # As on x86_64, install only the CUDA 13.2 components needed by this build.
+          # NVML headers are required at compile time; the driver library
+          # is loaded dynamically and does not need to be bundled.
           sudo apt-get install -y \
             cuda-nvcc-13-2 \
             cuda-cudart-dev-13-2 \
@@ -572,14 +575,14 @@ jobs:
             libcublas-dev-13-2 \
             libcurand-dev-13-2 \
             libnvjitlink-dev-13-2 \
+            cuda-nvml-dev-13-2 \
             cmake ninja-build patchelf
 
-          # Fail here, with the name of the missing file, rather than partway
-          # through the compile if NVIDIA ever repackages one of these out from
-          # under the hand-picked list above.
+          # Fail early if a required CUDA component is missing.
           for f in /usr/local/cuda-13.2/bin/nvcc \
                    /usr/local/cuda-13.2/include/cublas_v2.h \
                    /usr/local/cuda-13.2/include/cccl/cub/cub.cuh \
+                   /usr/local/cuda-13.2/include/nvml.h \
                    /usr/local/cuda-13.2/lib64/libcudart.so \
                    /usr/local/cuda-13.2/lib64/libcublas.so \
                    /usr/local/cuda-13.2/lib64/libcublasLt.so \
@@ -945,6 +948,12 @@ jobs:
         run: |
           choco install ninja
 
+      # The image's Clang 20 is too old for the VS 2026 18.12 STL headers (STL1000 needs Clang 22).
+      - name: Install LLVM
+        run: |
+          choco install llvm --version=22.1.8
+          echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+
       - name: Build
         shell: cmd
         run: |
@@ -1007,6 +1016,10 @@ jobs:
             build: x64
             repo: https://stable.repo.amd.com/rocm/whl-next/
           - ROCM_VERSION: "10.1.0"
+            gpu_targets: "gfx1010;gfx1011;gfx1012;gfx1030;gfx1031;gfx1032;gfx1033;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151;gfx1152;gfx1153;gfx1170;gfx1171;gfx1200;gfx1201"
+            build: x64
+            repo: https://stable.repo.amd.com/rocm/whl-next/
+          - ROCM_VERSION: "10.2.0"
             gpu_targets: "gfx1010;gfx1011;gfx1012;gfx1030;gfx1031;gfx1032;gfx1033;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151;gfx1152;gfx1153;gfx1170;gfx1171;gfx1200;gfx1201"
             build: x64
             repo: https://stable.repo.amd.com/rocm/whl-next/
@@ -1223,6 +1236,22 @@ jobs:
           method: 'network'
           sub-packages: '["nvcc", "crt", "nvvm", "nvptxcompiler", "cudart", "cublas", "cublas_dev", "curand", "nvjitlink", "thrust", "visual_studio_integration"]'
 
+      # ggml-cuda includes nvml.h but loads nvml.dll from the driver at runtime, so only the header is needed.
+      # Same redist archive upstream's windows-setup-cuda uses; 12.9.40 is the nvml_dev build in CUDA 12.9.0.
+      - name: Install NVML header
+        shell: pwsh
+        run: |
+          $name = 'cuda_nvml_dev-windows-x86_64-12.9.40-archive'
+          $zip = Join-Path $env:RUNNER_TEMP "$name.zip"
+          Invoke-WebRequest "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvml_dev/windows-x86_64/$name.zip" -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '97554a1b7d814d67add275757b0e2b4b83eb5d8e334fd226b80459eb5eb45334') {
+            throw "SHA256 mismatch for $name.zip"
+          }
+          Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP -Force
+          $header = Join-Path $env:CUDA_PATH 'include\nvml.h'
+          Copy-Item (Join-Path $env:RUNNER_TEMP "$name\include\nvml.h") $header -Force
+          if (-not (Test-Path $header)) { throw "CUDA install is missing $header" }
+
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
         with:
@@ -1367,7 +1396,7 @@ jobs:
         # OS, because two of the checks launch llama-server out of the archive
         # and install the ROCm a user of that archive would install.
         os: [ubuntu, win]
-        rocm: ["7.14", "10.0", "10.1"]
+        rocm: ["7.14", "10.0", "10.1", "10.2"]
         include:
           - os: ubuntu
             runner: ubuntu-24.04
@@ -1442,7 +1471,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      # Six legs: three ROCm versions (7.14, 10.0, 10.1) on each of Windows and Linux.
+      # Eight legs: four ROCm versions (7.14, 10.0, 10.1, 10.2) on each of Windows and Linux.
       matrix:
         include:
           - os: ubuntu
@@ -1454,6 +1483,9 @@ jobs:
           - os: ubuntu
             rocm: "10.1"
             runner: [xsj-dispatch, strix-halo, Linux]
+          - os: ubuntu
+            rocm: "10.2"
+            runner: [xsj-dispatch, strix-halo, Linux]
           - os: win
             rocm: "7.14"
             runner: [xsj-dispatch, strix-halo, Windows]
@@ -1462,6 +1494,9 @@ jobs:
             runner: [xsj-dispatch, strix-halo, Windows]
           - os: win
             rocm: "10.1"
+            runner: [xsj-dispatch, strix-halo, Windows]
+          - os: win
+            rocm: "10.2"
             runner: [xsj-dispatch, strix-halo, Windows]
 
     runs-on: ${{ matrix.runner }}
@@ -1719,6 +1754,7 @@ jobs:
             [rocm-7.14]="release/llama-${TAG}-bin-*rocm-7.14-*"
             [rocm-10.0]="release/llama-${TAG}-bin-*rocm-10.0-*"
             [rocm-10.1]="release/llama-${TAG}-bin-*rocm-10.1-*"
+            [rocm-10.2]="release/llama-${TAG}-bin-*rocm-10.2-*"
             # The two Ubuntu baselines are separate families.
             # They target different glibc versions, so a gap in one is no reason to withhold the other.
             [openvino-22]="release/llama-${TAG}-bin-ubuntu-22-openvino-*"
@@ -1754,7 +1790,7 @@ jobs:
           # name -- a missing version is a failed download on every machine
           # that wanted it, not a graceful fallback to another one.
           # Keep this list in step with the build matrices.
-          for rocm in 7.14 10.0 10.1; do
+          for rocm in 7.14 10.0 10.1 10.2; do
             check_glob "rocm-${rocm}" "release/llama-${TAG}-bin-ubuntu-rocm-${rocm}-x64.tar.gz"
             check_glob "rocm-${rocm}" "release/llama-${TAG}-bin-win-rocm-${rocm}-x64.zip"
           done
@@ -1872,7 +1908,7 @@ jobs:
           # rather than publish something unverified.
           blocked="$BLOCKED"
           if [ -z "$blocked" ]; then
-            blocked="7.14 10.0 10.1"
+            blocked="${ROCM_VERSIONS//,/ }"
             echo "::warning::Qualification produced no verdict — withholding every \
           ROCm version rather than publishing unverified artifacts."
           fi

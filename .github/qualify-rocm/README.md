@@ -32,7 +32,7 @@ archive. That is what this suite is for.
 Both tiers run on every trigger, pull requests included. The one exception is
 that Tier 1 is skipped for a pull request opened from a fork.
 
-Each tier runs one job per published archive — two operating systems by three
+Each tier runs one job per published archive — two operating systems by four
 ROCm versions — so a failure is reported against the exact archive it affects.
 
 Each ROCm version is treated as an independent product. A consumer downloads

@@ -27,7 +27,7 @@ The contract this writes is FEED.md, copied to the branch as SCHEMA.md.
 Usage:
     python3 publish_qualification.py --records-dir ./records \
         --data-dir ./data/qualification --operating-systems ubuntu,win \
-        --rocm-versions 7.14,10.0,10.1 --tag b12062 --upstream-sha <sha> \
+        --rocm-versions 7.14,10.0,10.1,10.2 --tag b12062 --upstream-sha <sha> \
         --jobs-file jobs.jsonl --published-artifacts "<names>" --post-merge-checked "<names>"
 """
 
@@ -354,7 +354,7 @@ def main():
     parser.add_argument("--operating-systems", required=True,
                         help="the operating systems every ROCm version is built for, e.g. ubuntu,win")
     parser.add_argument("--rocm-versions", required=True,
-                        help="the ROCm versions this run builds, e.g. 7.14,10.0,10.1")
+                        help="the ROCm versions this run builds, e.g. 7.14,10.0,10.1,10.2")
     parser.add_argument("--tag", required=True, help="the llama.cpp build number this run pinned")
     parser.add_argument("--upstream-sha", help="the llama.cpp commit this run pinned")
     parser.add_argument("--jobs-file",
