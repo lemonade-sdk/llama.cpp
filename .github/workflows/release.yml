@@ -324,6 +324,7 @@ jobs:
   ubuntu-22-cuda:
     needs: resolve-upstream
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -371,6 +372,7 @@ jobs:
           #   libcublas-dev      libcublas + libcublasLt
           #   libcurand-dev      bundled and asserted on by Validate
           #   libnvjitlink-dev   bundled and asserted on by Validate
+          #   cuda-nvml-dev      nvml.h, included by ggml-cuda (it dlopens the driver's NVML at runtime, nothing to bundle)
           # The -dev packages depend on their runtime counterparts, and
           # cuda-toolkit-12-9-config-common (a transitive dep) is what creates the
           # /usr/local/cuda -> /usr/local/cuda-12.9 alternative used below.
@@ -381,6 +383,7 @@ jobs:
             libcublas-dev-12-9 \
             libcurand-dev-12-9 \
             libnvjitlink-dev-12-9 \
+            cuda-nvml-dev-12-9 \
             cmake ninja-build patchelf
 
           # Fail here, with the name of the missing file, rather than partway
@@ -389,6 +392,7 @@ jobs:
           for f in /usr/local/cuda/bin/nvcc \
                    /usr/local/cuda/include/cublas_v2.h \
                    /usr/local/cuda/include/cub/cub.cuh \
+                   /usr/local/cuda/include/nvml.h \
                    /usr/local/cuda/lib64/libcudart.so \
                    /usr/local/cuda/lib64/libcublas.so \
                    /usr/local/cuda/lib64/libcublasLt.so \
@@ -528,6 +532,7 @@ jobs:
   ubuntu-22-cuda-arm64:
     needs: resolve-upstream
     runs-on: ubuntu-22.04-arm
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -573,6 +578,7 @@ jobs:
             libcublas-dev-12-9 \
             libcurand-dev-12-9 \
             libnvjitlink-dev-12-9 \
+            cuda-nvml-dev-12-9 \
             cmake ninja-build patchelf
 
           # Fail here, with the name of the missing file, rather than partway
@@ -581,6 +587,7 @@ jobs:
           for f in /usr/local/cuda/bin/nvcc \
                    /usr/local/cuda/include/cublas_v2.h \
                    /usr/local/cuda/include/cub/cub.cuh \
+                   /usr/local/cuda/include/nvml.h \
                    /usr/local/cuda/lib64/libcudart.so \
                    /usr/local/cuda/lib64/libcublas.so \
                    /usr/local/cuda/lib64/libcublasLt.so \
@@ -937,6 +944,12 @@ jobs:
         run: |
           choco install ninja
 
+      # The image's Clang 20 is too old for the VS 2026 18.12 STL headers (STL1000 needs Clang 22).
+      - name: Install LLVM
+        run: |
+          choco install llvm --version=22.1.8
+          echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+
       - name: Build
         shell: cmd
         run: |
@@ -1218,6 +1231,22 @@ jobs:
           cuda: '12.9.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "curand", "nvjitlink", "thrust", "visual_studio_integration"]'
+
+      # ggml-cuda includes nvml.h but loads nvml.dll from the driver at runtime, so only the header is needed.
+      # Same redist archive upstream's windows-setup-cuda uses; 12.9.40 is the nvml_dev build in CUDA 12.9.0.
+      - name: Install NVML header
+        shell: pwsh
+        run: |
+          $name = 'cuda_nvml_dev-windows-x86_64-12.9.40-archive'
+          $zip = Join-Path $env:RUNNER_TEMP "$name.zip"
+          Invoke-WebRequest "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvml_dev/windows-x86_64/$name.zip" -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '97554a1b7d814d67add275757b0e2b4b83eb5d8e334fd226b80459eb5eb45334') {
+            throw "SHA256 mismatch for $name.zip"
+          }
+          Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP -Force
+          $header = Join-Path $env:CUDA_PATH 'include\nvml.h'
+          Copy-Item (Join-Path $env:RUNNER_TEMP "$name\include\nvml.h") $header -Force
+          if (-not (Test-Path $header)) { throw "CUDA install is missing $header" }
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
