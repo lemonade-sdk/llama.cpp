@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-20T21:50:05Z",
+  "generated_at": "2026-11-21T16:34:12Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@44732674749",
-    "artifact": "llama-b12576-bin-ubuntu-rocm-7.14-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@44841662058",
+    "artifact": "llama-b12600-bin-ubuntu-rocm-7.14-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b12576",
-    "upstream_sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+    "llamacpp_tag": "b12600",
+    "upstream_sha": "29b52d398b294509746ec0a3f28948a3107c0213",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "44732674749",
+    "run_id": "44841662058",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1587225288
+            "bytes": 1586553336
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 14839,
+          "duration_ms": 20833,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1587225288,
+            "bytes_scanned": 1586553336,
             "bundle_magic_count": 141,
             "expected_count": 27,
             "present_count": 27,
@@ -204,7 +204,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -222,7 +222,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -289,7 +289,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 2,
+          "duration_ms": 3,
           "error": null,
           "details": {
             "leaked": {}
@@ -301,11 +301,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 13,
+          "duration_ms": 16,
           "error": null,
           "details": {
             "returncode": 0,
-            "help_bytes": 62893,
+            "help_bytes": 63442,
             "flags_checked": 12,
             "flags_missing": []
           }
@@ -316,14 +316,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3497,
+          "duration_ms": 4172,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 316136830,
-            "sha256": "f8f34a42ca6be0b5c1b13736ae294597e1c6e4dc299da6a51ebd8de784b12d89",
-            "expected_sha256": "f8f34a42ca6be0b5c1b13736ae294597e1c6e4dc299da6a51ebd8de784b12d89"
+            "bytes": 315877668,
+            "sha256": "fa7c353de15b890ad5040b78eee1679b4544e32934361b244155627ef35fade0",
+            "expected_sha256": "fa7c353de15b890ad5040b78eee1679b4544e32934361b244155627ef35fade0"
           }
         },
         {
@@ -332,7 +332,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -384,7 +384,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 1,
+          "duration_ms": 2,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -431,7 +431,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 706,
+          "duration_ms": 632,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
