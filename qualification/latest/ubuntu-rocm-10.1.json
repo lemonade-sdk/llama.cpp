@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-22T00:37:10Z",
+  "generated_at": "2026-11-22T11:41:06Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@44902055665",
-    "artifact": "llama-b12614-bin-ubuntu-rocm-10.1-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@44965138070",
+    "artifact": "llama-b12625-bin-ubuntu-rocm-10.1-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12614",
-    "upstream_sha": "b019be0c86e8adaf8b46627c091c24c1597b95f9",
+    "llamacpp_tag": "b12625",
+    "upstream_sha": "cbb1c1c50bba81929387dea473873d1df87a6212",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "44902055665",
+    "run_id": "44965138070",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -70,7 +70,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 22564,
+          "duration_ms": 26977,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
@@ -307,7 +307,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 64,
+          "duration_ms": 66,
           "error": null,
           "details": {
             "returncode": 0,
@@ -322,14 +322,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 6345,
+          "duration_ms": 5486,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 346799674,
-            "sha256": "51ed776a926fb507824f4ab45a6b21410fdb317304a7d76e24c12b9239c95ed1",
-            "expected_sha256": "51ed776a926fb507824f4ab45a6b21410fdb317304a7d76e24c12b9239c95ed1"
+            "bytes": 346848159,
+            "sha256": "f40119822d9f5e54289e1532891b365c9717d3bf74971c47bf033fb834c3c4f2",
+            "expected_sha256": "f40119822d9f5e54289e1532891b365c9717d3bf74971c47bf033fb834c3c4f2"
           }
         },
         {
@@ -390,7 +390,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 2,
+          "duration_ms": 1,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -420,7 +420,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 785,
+          "duration_ms": 778,
           "error": null,
           "details": {
             "finish_reason": "stop",
@@ -437,7 +437,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 648,
+          "duration_ms": 642,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
