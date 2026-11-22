@@ -1767,11 +1767,18 @@ jobs:
           # that whole family from the release; other families are unaffected.
           # Each CUDA sm target is its own family, like each ROCm version: it
           # ships only when Ubuntu x64, Ubuntu arm64 and Windows all built it.
+          # Record which platform each dropped sm is missing on, so the release notes can name it.
+          cuda_missing=""
+          check_cuda() {
+            local sm="$1" platform="$2" file="$3"
+            [ -e "$file" ] || cuda_missing="${cuda_missing}${sm}=${platform};"
+            check_glob "cuda-${sm}" "$file"
+          }
           for sm in ${CUDA_SMS//,/ }; do
             family_glob[cuda-${sm}]="release/llama-${TAG}-*-cuda-${sm}-*"
-            check_glob "cuda-${sm}" "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
-            check_glob "cuda-${sm}" "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
-            check_glob "cuda-${sm}" "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
+            check_cuda "$sm" "Linux x64" "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
+            check_cuda "$sm" "Linux arm64" "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
+            check_cuda "$sm" "Windows x64" "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
           done
 
           # Enumerate every ROCm version explicitly, the way the CUDA sm loop
@@ -1800,6 +1807,7 @@ jobs:
           done
           echo "missing=$missing" >> "$GITHUB_OUTPUT"
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
+          echo "cuda_missing=$cuda_missing" >> "$GITHUB_OUTPUT"
 
           files=$(find ./release -maxdepth 1 \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.tar.xz' -o -name '*.7z' \) 2>/dev/null | wc -l)
 
@@ -1946,6 +1954,7 @@ jobs:
         env:
           TAG_NAME: ${{ steps.tag.outputs.name }}
           RELEASE_SUMMARY: ${{ steps.release_summary.outputs.value }}
+          CUDA_MISSING: ${{ steps.check_artifacts.outputs.cuda_missing }}
         with:
           script: |
             const fs = require('fs');
@@ -2011,13 +2020,24 @@ jobs:
 
             // Anything the release normally carries but this run is not attaching.
             // A ROCm version ships as a Windows + Linux pair or not at all, and a CUDA sm target ships on all three platforms or not at all.
+            const cudaMissingOn = {};
+            for (const entry of (process.env.CUDA_MISSING || '').split(';').filter(Boolean)) {
+              const [sm, platform] = entry.split('=');
+              (cudaMissingOn[sm] ||= []).push(platform);
+            }
+            const cudaDropped = (sm) => {
+              const on = cudaMissingOn[sm] || [];
+              return on.length && on.length < 3
+                ? `- CUDA ${sm}: did not build on ${on.join(' and ')}, so it is not released on any platform.`
+                : `- CUDA ${sm}: did not build on any platform.`;
+            };
             const missing = [
               ...versions
                 .filter((v) => !attached.has(rocm('ubuntu', v)) || !attached.has(rocm('win', v)))
                 .map((v) => `- ROCm ${v}: did not build, or did not pass the release checks. The attached \`qualification-*.json\` records list the failing checks.`),
               ...process.env.CUDA_SMS.split(',').map((sm) => sm.trim()).filter(Boolean)
                 .filter((sm) => !files.some((file) => file.includes(`-cuda-${sm}-`)))
-                .map((sm) => `- CUDA ${sm}: did not build on all of Linux x64, Linux arm64 and Windows x64.`),
+                .map(cudaDropped),
               ...Object.entries(OPENVINO_FOR)
                 .filter(([ubuntu]) => !openvino.some((m) => m[1] === ubuntu))
                 .map(([, label]) => `- OpenVINO for ${label}: did not build, or did not pass its package checks.`),
