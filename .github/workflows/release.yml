@@ -30,6 +30,9 @@ env:
   ROCM_VERSIONS: "7.14,10.0,10.1,10.2"
   ROCM_OPERATING_SYSTEMS: "ubuntu,win"
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  # The CUDA sm targets every run should produce on Linux x64, Linux arm64 and Windows x64.
+  # Keep in step with the ubuntu-22-cuda / ubuntu-22-cuda-arm64 / windows-cuda matrices.
+  CUDA_SMS: "sm_75,sm_80,sm_86,sm_89,sm_90,sm_100,sm_120,sm_121,sm_all"
   # Device code for all currently shipped CUDA sm_* variants, once per platform.
   CUDA_ALL_ARCHITECTURES: "75-real;80-real;86-real;89-real;90-real;100-real;120a-real;121a-real"
   CMAKE_ARGS: "-DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON"
@@ -413,12 +416,7 @@ jobs:
             -DLLAMA_BUILD_BORINGSSL=ON \
             -DCMAKE_BUILD_TYPE=Release \
             ${{ env.CMAKE_ARGS }}
-          # Limit concurrent nvcc processes for the much larger fat binary.
-          build_jobs=$(nproc)
-          if [ "${{ matrix.sm }}" = "sm_all" ]; then
-            build_jobs=2
-          fi
-          cmake --build build --config Release -j "$build_jobs"
+          cmake --build build --config Release -j $(nproc)
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -616,12 +614,7 @@ jobs:
             -DLLAMA_BUILD_BORINGSSL=ON \
             -DCMAKE_BUILD_TYPE=Release \
             ${{ env.CMAKE_ARGS }}
-          # Limit concurrent nvcc processes for the much larger fat binary.
-          build_jobs=$(nproc)
-          if [ "${{ matrix.sm }}" = "sm_all" ]; then
-            build_jobs=2
-          fi
-          cmake --build build --config Release -j "$build_jobs"
+          cmake --build build --config Release -j $(nproc)
 
       - name: Bundle CUDA runtime libraries
         run: |
@@ -744,6 +737,7 @@ jobs:
             ubuntu: "24"
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     steps:
       - name: Clone
@@ -922,6 +916,7 @@ jobs:
   windows-cpu:
     needs: resolve-upstream
     runs-on: windows-2025
+    timeout-minutes: 30
 
     strategy:
       matrix:
@@ -1276,11 +1271,7 @@ jobs:
             -DGGML_BACKEND_DL=ON ^
             -DLLAMA_BUILD_BORINGSSL=ON ^
             ${{ env.CMAKE_ARGS }}
-          if "%sm%"=="sm_all" (
-            cmake --build build --config Release --parallel 2
-          ) else (
-            cmake --build build --config Release
-          )
+          cmake --build build --config Release
 
       - name: Download CPU backend artifact
         uses: actions/download-artifact@v7
@@ -1500,6 +1491,7 @@ jobs:
             runner: [xsj-dispatch, strix-halo, Windows]
 
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     steps:
       - name: Checkout qualification suite
@@ -1746,7 +1738,6 @@ jobs:
           # drop the whole family if any piece of it is missing. Must not
           # overlap with any other family's files.
           declare -A family_glob=(
-            [cuda]="release/llama-${TAG}-*cuda-sm_*"
             # Each ROCm version is its own family. They are independent
             # products: a consumer downloads exactly one of them, so a gap in
             # 7.14 is no reason to withhold a perfectly good 10.0 build. What
@@ -1772,18 +1763,18 @@ jobs:
 
           # Each backend family is checked independently, but must be
           # published as a complete, internally-consistent set across every
-          # platform/variant it covers (all 8 single-SM packages plus sm_all on
-          # Ubuntu x64/arm64 and Windows) — never a partial mix. A gap in one
-          # family drops that whole family from the release; other families
-          # are unaffected. Keep this sm_* list in step with the three CUDA
-          # build matrices, or an arch can be built but never verified.
-          for sm in sm_75 sm_80 sm_86 sm_89 sm_90 sm_100 sm_120 sm_121 sm_all; do
-            check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
-            check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
-            check_glob cuda "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
+          # platform it covers — never a partial mix. A gap in one family drops
+          # that whole family from the release; other families are unaffected.
+          # Each CUDA sm target is its own family, like each ROCm version: it
+          # ships only when Ubuntu x64, Ubuntu arm64 and Windows all built it.
+          for sm in ${CUDA_SMS//,/ }; do
+            family_glob[cuda-${sm}]="release/llama-${TAG}-*-cuda-${sm}-*"
+            check_glob "cuda-${sm}" "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
+            check_glob "cuda-${sm}" "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
+            check_glob "cuda-${sm}" "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
           done
 
-          # Enumerate every ROCm version explicitly, the way the CUDA sm_* loop
+          # Enumerate every ROCm version explicitly, the way the CUDA sm loop
           # above does. A bare `-rocm-*-` glob is satisfied by ANY single
           # version, so a release missing one version entirely would still pass.
           # That matters because a consumer asks for one exact ROCm version by
@@ -2019,13 +2010,14 @@ jobs:
             ];
 
             // Anything the release normally carries but this run is not attaching.
-            // A ROCm version ships as a Windows + Linux pair or not at all, and one failed CUDA arch drops every CUDA build.
+            // A ROCm version ships as a Windows + Linux pair or not at all, and a CUDA sm target ships on all three platforms or not at all.
             const missing = [
               ...versions
                 .filter((v) => !attached.has(rocm('ubuntu', v)) || !attached.has(rocm('win', v)))
                 .map((v) => `- ROCm ${v}: did not build, or did not pass the release checks. The attached \`qualification-*.json\` records list the failing checks.`),
-              ...(files.some((file) => file.includes('-cuda-sm_'))
-                ? [] : ['- CUDA: at least one CUDA build failed, so no CUDA builds are included.']),
+              ...process.env.CUDA_SMS.split(',').map((sm) => sm.trim()).filter(Boolean)
+                .filter((sm) => !files.some((file) => file.includes(`-cuda-${sm}-`)))
+                .map((sm) => `- CUDA ${sm}: did not build on all of Linux x64, Linux arm64 and Windows x64.`),
               ...Object.entries(OPENVINO_FOR)
                 .filter(([ubuntu]) => !openvino.some((m) => m[1] === ubuntu))
                 .map(([, label]) => `- OpenVINO for ${label}: did not build, or did not pass its package checks.`),
