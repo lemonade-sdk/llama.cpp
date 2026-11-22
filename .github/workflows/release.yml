@@ -326,7 +326,7 @@ jobs:
   ubuntu-22-cuda:
     needs: resolve-upstream
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: ${{ matrix.sm == 'sm_all' && 300 || 120 }}
 
     strategy:
       fail-fast: false
@@ -528,7 +528,7 @@ jobs:
   ubuntu-22-cuda-arm64:
     needs: resolve-upstream
     runs-on: ubuntu-22.04-arm
-    timeout-minutes: 120
+    timeout-minutes: ${{ matrix.sm == 'sm_all' && 300 || 120 }}
 
     strategy:
       fail-fast: false
@@ -1237,14 +1237,14 @@ jobs:
           sub-packages: '["nvcc", "crt", "nvvm", "nvptxcompiler", "cudart", "cublas", "cublas_dev", "curand", "nvjitlink", "thrust", "visual_studio_integration"]'
 
       # ggml-cuda includes nvml.h but loads nvml.dll from the driver at runtime, so only the header is needed.
-      # Same redist archive upstream's windows-setup-cuda uses; 12.9.40 is the nvml_dev build in CUDA 12.9.0.
+      # Same redist archive upstream's windows-setup-cuda uses; 13.2.51 is the nvml_dev build in CUDA 13.2.0.
       - name: Install NVML header
         shell: pwsh
         run: |
-          $name = 'cuda_nvml_dev-windows-x86_64-12.9.40-archive'
+          $name = 'cuda_nvml_dev-windows-x86_64-13.2.51-archive'
           $zip = Join-Path $env:RUNNER_TEMP "$name.zip"
           Invoke-WebRequest "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvml_dev/windows-x86_64/$name.zip" -OutFile $zip
-          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '97554a1b7d814d67add275757b0e2b4b83eb5d8e334fd226b80459eb5eb45334') {
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '9330874f32cf8238deb1f71835642d95c57477bd040a0aef4e1d16efa4f0a977') {
             throw "SHA256 mismatch for $name.zip"
           }
           Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP -Force
@@ -1974,6 +1974,8 @@ jobs:
             // runner image its build job uses. Update these if a job moves to another image.
             const ROCM_RUNS_ON = 'Ubuntu 24.04 or newer';
             const CUDA_RUNS_ON = 'Ubuntu 22.04 or newer';
+            // Lowest driver branch for the CUDA 13.x runtime the CUDA builds bundle. Update it with the CUDA major version.
+            const CUDA_DRIVER = 'NVIDIA driver 580 or newer';
             // Both OpenVINO builds start on 24.04. Each is labelled with the Ubuntu it is meant for,
             // so a 24.04 user picks the build made against OpenVINO's own Ubuntu 24.04 runtime.
             const OPENVINO_FOR = { '22': 'Ubuntu 22.04', '24': 'Ubuntu 24.04 or newer' };
@@ -1989,18 +1991,19 @@ jobs:
               .filter(Boolean)
               .sort((a, b) => Number(a[1]) - Number(b[1]));
 
+            // Linux CUDA links sit inside a table cell, where a bare | would start a new column, so they are joined with an escaped one.
             const linuxX64 = [
               ...versions.filter((v) => attached.has(rocm('ubuntu', v)))
                 .map((v) => [`ROCm ${v}`, ROCM_RUNS_ON, md('download', rocm('ubuntu', v))]),
               ...openvino.map((m) => [`OpenVINO ${m[2]}`, OPENVINO_FOR[m[1]] || `Ubuntu ${m[1]}.04 or newer`, md('download', m[0])]),
               ...(() => {
                 const links = cudaLinks('ubuntu', 'x64\\.tar\\.xz');
-                return links.length ? [['CUDA', CUDA_RUNS_ON, links.join(' ')]] : [];
+                return links.length ? [['CUDA', `${CUDA_RUNS_ON}, ${CUDA_DRIVER}`, links.join(' \\| ')]] : [];
               })(),
             ];
             const linuxArm64 = (() => {
               const links = cudaLinks('ubuntu', 'arm64\\.tar\\.xz');
-              return links.length ? [['CUDA', CUDA_RUNS_ON, links.join(' ')]] : [];
+              return links.length ? [['CUDA', `${CUDA_RUNS_ON}, ${CUDA_DRIVER}`, links.join(' \\| ')]] : [];
             })();
             const table = (title, rows) => rows.length
               ? [`**${title}**`, '', '| Package | Runs on | Download |', '|---|---|---|', ...rows.map((r) => `| ${r.join(' | ')} |`), '']
@@ -2012,7 +2015,7 @@ jobs:
             const windows = [
               ...(attached.has(cpu) ? [`- CPU: ${md('download', cpu)}`] : []),
               ...(windowsRocm.length ? [`- ROCm: ${windowsRocm.join(' | ')}`] : []),
-              ...(windowsCuda.length ? [`- CUDA: ${windowsCuda.join(' | ')}`] : []),
+              ...(windowsCuda.length ? [`- CUDA (${CUDA_DRIVER}): ${windowsCuda.join(' | ')}`] : []),
             ];
 
             // Anything the release normally carries but this run is not attaching.
