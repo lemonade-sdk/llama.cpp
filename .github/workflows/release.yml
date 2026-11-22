@@ -30,6 +30,11 @@ env:
   ROCM_VERSIONS: "7.14,10.0,10.1,10.2"
   ROCM_OPERATING_SYSTEMS: "ubuntu,win"
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  # The CUDA sm targets every run should produce on Linux x64, Linux arm64 and Windows x64.
+  # Keep in step with the ubuntu-22-cuda / ubuntu-22-cuda-arm64 / windows-cuda matrices.
+  CUDA_SMS: "sm_75,sm_80,sm_86,sm_89,sm_90,sm_100,sm_120,sm_121,sm_all"
+  # Device code for all currently shipped CUDA sm_* variants, once per platform.
+  CUDA_ALL_ARCHITECTURES: "75-real;80-real;86-real;89-real;90-real;100-real;120a-real;121a-real"
   CMAKE_ARGS: "-DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON"
 
 jobs:
@@ -324,14 +329,14 @@ jobs:
   ubuntu-22-cuda:
     needs: resolve-upstream
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: ${{ matrix.sm == 'sm_all' && 300 || 120 }}
 
     strategy:
       fail-fast: false
       matrix:
-        # On PRs only build one representative arch (packaging logic is identical
-        # across all sm_*); build the full matrix on schedule/dispatch.
-        sm: ${{ github.event_name == 'pull_request' && fromJSON('["sm_89"]') || fromJSON('["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121"]') }}
+        # PRs compile sm_all to exercise every CUDA architecture; scheduled and
+        # manual releases also retain the eight existing single-SM packages.
+        sm: ${{ github.event_name == 'pull_request' && fromJSON('["sm_all"]') || fromJSON('["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121", "sm_all"]') }}
 
     steps:
       - name: Clone
@@ -360,57 +365,46 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          # Install only the components this build actually consumes rather than
-          # the cuda-toolkit-12-9 metapackage. That metapackage drags in Nsight
-          # Systems/Compute, cuFFT, cuSPARSE, cuSOLVER and NPP -- ~3.9 GB of
-          # archives per job, none of it compiled against or shipped. The subset
-          # below is ~1.2 GB and covers everything the Build, Bundle CUDA runtime
-          # libraries and Validate steps reference:
-          #   cuda-nvcc          the compiler (pulls cuda-crt, cuda-nvvm)
-          #   cuda-cudart-dev    libcudart + the libcuda.so stub (CUDA::cuda_driver)
-          #   cuda-cccl          thrust/cub headers included by ggml-cuda
-          #   libcublas-dev      libcublas + libcublasLt
-          #   libcurand-dev      bundled and asserted on by Validate
-          #   libnvjitlink-dev   bundled and asserted on by Validate
-          #   cuda-nvml-dev      nvml.h, included by ggml-cuda (it dlopens the driver's NVML at runtime, nothing to bundle)
-          # The -dev packages depend on their runtime counterparts, and
-          # cuda-toolkit-12-9-config-common (a transitive dep) is what creates the
-          # /usr/local/cuda -> /usr/local/cuda-12.9 alternative used below.
+
+          # Install only the CUDA 13.2 components required by this build.
+          # NVML headers are needed at compile time; the driver library
+          # is loaded dynamically and does not need to be bundled.
           sudo apt-get install -y \
-            cuda-nvcc-12-9 \
-            cuda-cudart-dev-12-9 \
-            cuda-cccl-12-9 \
-            libcublas-dev-12-9 \
-            libcurand-dev-12-9 \
-            libnvjitlink-dev-12-9 \
-            cuda-nvml-dev-12-9 \
+            cuda-nvcc-13-2 \
+            cuda-cudart-dev-13-2 \
+            cuda-cccl-13-2 \
+            libcublas-dev-13-2 \
+            libcurand-dev-13-2 \
+            libnvjitlink-dev-13-2 \
+            cuda-nvml-dev-13-2 \
             cmake ninja-build patchelf
 
-          # Fail here, with the name of the missing file, rather than partway
-          # through the compile if NVIDIA ever repackages one of these out from
-          # under the hand-picked list above.
-          for f in /usr/local/cuda/bin/nvcc \
-                   /usr/local/cuda/include/cublas_v2.h \
-                   /usr/local/cuda/include/cub/cub.cuh \
-                   /usr/local/cuda/include/nvml.h \
-                   /usr/local/cuda/lib64/libcudart.so \
-                   /usr/local/cuda/lib64/libcublas.so \
-                   /usr/local/cuda/lib64/libcublasLt.so \
-                   /usr/local/cuda/lib64/libcurand.so \
-                   /usr/local/cuda/lib64/libnvJitLink.so; do
+          # Fail early if any required CUDA component is missing.
+          for f in /usr/local/cuda-13.2/bin/nvcc \
+                   /usr/local/cuda-13.2/include/cublas_v2.h \
+                   /usr/local/cuda-13.2/include/cccl/cub/cub.cuh \
+                   /usr/local/cuda-13.2/include/nvml.h \
+                   /usr/local/cuda-13.2/lib64/libcudart.so \
+                   /usr/local/cuda-13.2/lib64/libcublas.so \
+                   /usr/local/cuda-13.2/lib64/libcublasLt.so \
+                   /usr/local/cuda-13.2/lib64/libcurand.so \
+                   /usr/local/cuda-13.2/lib64/libnvJitLink.so; do
             [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
           done
 
       - name: Set CUDA environment
         run: |
-          echo "CUDA_PATH=/usr/local/cuda" >> "$GITHUB_ENV"
-          echo "/usr/local/cuda/bin" >> "$GITHUB_PATH"
-          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-
+          echo "CUDA_PATH=/usr/local/cuda-13.2" >> "$GITHUB_ENV"
+          echo "/usr/local/cuda-13.2/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-13.2/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
       - name: Build
         run: |
           cmake_arch="${{ matrix.sm }}"
-          cmake_arch="${cmake_arch#sm_}"
+          if [ "$cmake_arch" = "sm_all" ]; then
+            cmake_arch="$CUDA_ALL_ARCHITECTURES"
+          else
+            cmake_arch="${cmake_arch#sm_}"
+          fi
           cmake -B build -S . \
             -DGGML_CUDA=ON \
             -DCMAKE_CUDA_ARCHITECTURES="${cmake_arch}" \
@@ -426,7 +420,7 @@ jobs:
 
       - name: Bundle CUDA runtime libraries
         run: |
-          cuda_lib=/usr/local/cuda/lib64
+          cuda_lib=/usr/local/cuda-13.2/lib64
           cp -av ${cuda_lib}/libcudart.so*   build/bin/
           cp -av ${cuda_lib}/libcublas.so*   build/bin/
           cp -av ${cuda_lib}/libcublasLt.so* build/bin/
@@ -532,14 +526,14 @@ jobs:
   ubuntu-22-cuda-arm64:
     needs: resolve-upstream
     runs-on: ubuntu-22.04-arm
-    timeout-minutes: 120
+    timeout-minutes: ${{ matrix.sm == 'sm_all' && 300 || 120 }}
 
     strategy:
       fail-fast: false
       matrix:
-        # On PRs only build one representative arch (packaging logic is identical
-        # across all sm_*); build the full matrix on schedule/dispatch.
-        sm: ${{ github.event_name == 'pull_request' && fromJSON('["sm_89"]') || fromJSON('["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121"]') }}
+        # PRs compile sm_all to exercise every CUDA architecture; scheduled and
+        # manual releases also retain the eight existing single-SM packages.
+        sm: ${{ github.event_name == 'pull_request' && fromJSON('["sm_all"]') || fromJSON('["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121", "sm_all"]') }}
 
     steps:
       - name: Clone
@@ -568,44 +562,47 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
-          # See the x86_64 job above for why this is a hand-picked subset rather
-          # than the cuda-toolkit-12-9 metapackage. On sbsa the metapackage is
-          # ~3.3 GB of archives; this subset is ~1.2 GB.
+
+          # As on x86_64, install only the CUDA 13.2 components needed by this build.
+          # NVML headers are required at compile time; the driver library
+          # is loaded dynamically and does not need to be bundled.
           sudo apt-get install -y \
-            cuda-nvcc-12-9 \
-            cuda-cudart-dev-12-9 \
-            cuda-cccl-12-9 \
-            libcublas-dev-12-9 \
-            libcurand-dev-12-9 \
-            libnvjitlink-dev-12-9 \
-            cuda-nvml-dev-12-9 \
+            cuda-nvcc-13-2 \
+            cuda-cudart-dev-13-2 \
+            cuda-cccl-13-2 \
+            libcublas-dev-13-2 \
+            libcurand-dev-13-2 \
+            libnvjitlink-dev-13-2 \
+            cuda-nvml-dev-13-2 \
             cmake ninja-build patchelf
 
-          # Fail here, with the name of the missing file, rather than partway
-          # through the compile if NVIDIA ever repackages one of these out from
-          # under the hand-picked list above.
-          for f in /usr/local/cuda/bin/nvcc \
-                   /usr/local/cuda/include/cublas_v2.h \
-                   /usr/local/cuda/include/cub/cub.cuh \
-                   /usr/local/cuda/include/nvml.h \
-                   /usr/local/cuda/lib64/libcudart.so \
-                   /usr/local/cuda/lib64/libcublas.so \
-                   /usr/local/cuda/lib64/libcublasLt.so \
-                   /usr/local/cuda/lib64/libcurand.so \
-                   /usr/local/cuda/lib64/libnvJitLink.so; do
+          # Fail early if a required CUDA component is missing.
+          for f in /usr/local/cuda-13.2/bin/nvcc \
+                   /usr/local/cuda-13.2/include/cublas_v2.h \
+                   /usr/local/cuda-13.2/include/cccl/cub/cub.cuh \
+                   /usr/local/cuda-13.2/include/nvml.h \
+                   /usr/local/cuda-13.2/lib64/libcudart.so \
+                   /usr/local/cuda-13.2/lib64/libcublas.so \
+                   /usr/local/cuda-13.2/lib64/libcublasLt.so \
+                   /usr/local/cuda-13.2/lib64/libcurand.so \
+                   /usr/local/cuda-13.2/lib64/libnvJitLink.so; do
             [ -e "$f" ] || { echo "::error::CUDA install is missing $f"; exit 1; }
           done
 
       - name: Set CUDA environment
         run: |
-          echo "CUDA_PATH=/usr/local/cuda" >> "$GITHUB_ENV"
-          echo "/usr/local/cuda/bin" >> "$GITHUB_PATH"
-          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "CUDA_PATH=/usr/local/cuda-13.2" >> "$GITHUB_ENV"
+          echo "/usr/local/cuda-13.2/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-13.2/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Build
         run: |
           cmake_arch="${{ matrix.sm }}"
-          cmake_arch="${cmake_arch#sm_}"
+          if [ "$cmake_arch" = "sm_all" ]; then
+            cmake_arch="$CUDA_ALL_ARCHITECTURES"
+          else
+            cmake_arch="${cmake_arch#sm_}"
+          fi
           cmake -B build -S . \
             -DGGML_CUDA=ON \
             -DCMAKE_CUDA_ARCHITECTURES="${cmake_arch}" \
@@ -621,7 +618,7 @@ jobs:
 
       - name: Bundle CUDA runtime libraries
         run: |
-          cuda_lib=/usr/local/cuda/lib64
+          cuda_lib=/usr/local/cuda-13.2/lib64
           cp -av ${cuda_lib}/libcudart.so*   build/bin/
           cp -av ${cuda_lib}/libcublas.so*   build/bin/
           cp -av ${cuda_lib}/libcublasLt.so* build/bin/
@@ -740,6 +737,7 @@ jobs:
             ubuntu: "24"
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     steps:
       - name: Clone
@@ -918,6 +916,7 @@ jobs:
   windows-cpu:
     needs: resolve-upstream
     runs-on: windows-2025
+    timeout-minutes: 30
 
     strategy:
       matrix:
@@ -1212,9 +1211,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # On PRs only build one representative arch (packaging logic is identical
-        # across all sm_*); build the full matrix on schedule/dispatch.
-        sm: ${{ github.event_name == 'pull_request' && fromJSON('["sm_89"]') || fromJSON('["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121"]') }}
+        # PRs compile sm_all to exercise every CUDA architecture; scheduled and
+        # manual releases also retain the eight existing single-SM packages.
+        sm: ${{ github.event_name == 'pull_request' && fromJSON('["sm_all"]') || fromJSON('["sm_75", "sm_80", "sm_86", "sm_89", "sm_90", "sm_100", "sm_120", "sm_121", "sm_all"]') }}
 
     steps:
       - name: Clone
@@ -1228,19 +1227,19 @@ jobs:
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.9.0'
+          cuda: '13.2.0'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "curand", "nvjitlink", "thrust", "visual_studio_integration"]'
+          sub-packages: '["nvcc", "crt", "nvvm", "nvptxcompiler", "cudart", "cublas", "cublas_dev", "curand", "nvjitlink", "thrust", "visual_studio_integration"]'
 
       # ggml-cuda includes nvml.h but loads nvml.dll from the driver at runtime, so only the header is needed.
-      # Same redist archive upstream's windows-setup-cuda uses; 12.9.40 is the nvml_dev build in CUDA 12.9.0.
+      # Same redist archive upstream's windows-setup-cuda uses; 13.2.51 is the nvml_dev build in CUDA 13.2.0.
       - name: Install NVML header
         shell: pwsh
         run: |
-          $name = 'cuda_nvml_dev-windows-x86_64-12.9.40-archive'
+          $name = 'cuda_nvml_dev-windows-x86_64-13.2.51-archive'
           $zip = Join-Path $env:RUNNER_TEMP "$name.zip"
           Invoke-WebRequest "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvml_dev/windows-x86_64/$name.zip" -OutFile $zip
-          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '97554a1b7d814d67add275757b0e2b4b83eb5d8e334fd226b80459eb5eb45334') {
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '9330874f32cf8238deb1f71835642d95c57477bd040a0aef4e1d16efa4f0a977') {
             throw "SHA256 mismatch for $name.zip"
           }
           Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP -Force
@@ -1264,9 +1263,10 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
           set sm=${{ matrix.sm }}
           set cmake_arch=%sm:sm_=%
+          if "%sm%"=="sm_all" set "cmake_arch=%CUDA_ALL_ARCHITECTURES%"
           cmake -S . -B build -G "Ninja Multi-Config" ^
             -DGGML_CUDA=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES=%cmake_arch% ^
+            "-DCMAKE_CUDA_ARCHITECTURES=%cmake_arch%" ^
             -DGGML_NATIVE=OFF ^
             -DGGML_BACKEND_DL=ON ^
             -DLLAMA_BUILD_BORINGSSL=ON ^
@@ -1283,7 +1283,7 @@ jobs:
         run: |
           $releaseDir = '.\build\bin\Release'
           $cpuArchive = '.\cpu-artifact\llama-bin-win-cpu-x64.zip'
-          $cudaBin = Join-Path $env:CUDA_PATH 'bin'
+          $cudaBin = Join-Path $env:CUDA_PATH 'bin\x64'
           $cpuExtractDir = Join-Path $env:RUNNER_TEMP "cpu-backend-${{ matrix.sm }}"
 
           if (-not (Test-Path $cpuArchive)) {
@@ -1491,6 +1491,7 @@ jobs:
             runner: [xsj-dispatch, strix-halo, Windows]
 
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
 
     steps:
       - name: Checkout qualification suite
@@ -1737,7 +1738,6 @@ jobs:
           # drop the whole family if any piece of it is missing. Must not
           # overlap with any other family's files.
           declare -A family_glob=(
-            [cuda]="release/llama-${TAG}-*cuda-sm_*"
             # Each ROCm version is its own family. They are independent
             # products: a consumer downloads exactly one of them, so a gap in
             # 7.14 is no reason to withhold a perfectly good 10.0 build. What
@@ -1763,18 +1763,25 @@ jobs:
 
           # Each backend family is checked independently, but must be
           # published as a complete, internally-consistent set across every
-          # platform/variant it covers (e.g. all 8 CUDA sm_* builds for
-          # ubuntu x64/arm64 and windows) — never a partial mix. A gap in one
-          # family drops that whole family from the release; other families
-          # are unaffected. Keep this sm_* list in step with the three CUDA
-          # build matrices, or an arch can be built but never verified.
-          for sm in sm_75 sm_80 sm_86 sm_89 sm_90 sm_100 sm_120 sm_121; do
-            check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
-            check_glob cuda "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
-            check_glob cuda "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
+          # platform it covers — never a partial mix. A gap in one family drops
+          # that whole family from the release; other families are unaffected.
+          # Each CUDA sm target is its own family, like each ROCm version: it
+          # ships only when Ubuntu x64, Ubuntu arm64 and Windows all built it.
+          # Record which platform each dropped sm is missing on, so the release notes can name it.
+          cuda_missing=""
+          check_cuda() {
+            local sm="$1" platform="$2" file="$3"
+            [ -e "$file" ] || cuda_missing="${cuda_missing}${sm}=${platform};"
+            check_glob "cuda-${sm}" "$file"
+          }
+          for sm in ${CUDA_SMS//,/ }; do
+            family_glob[cuda-${sm}]="release/llama-${TAG}-*-cuda-${sm}-*"
+            check_cuda "$sm" "Linux x64" "release/llama-${TAG}-ubuntu-cuda-${sm}-x64.tar.xz"
+            check_cuda "$sm" "Linux arm64" "release/llama-${TAG}-ubuntu-cuda-${sm}-arm64.tar.xz"
+            check_cuda "$sm" "Windows x64" "release/llama-${TAG}-windows-cuda-${sm}-x64.7z"
           done
 
-          # Enumerate every ROCm version explicitly, the way the CUDA sm_* loop
+          # Enumerate every ROCm version explicitly, the way the CUDA sm loop
           # above does. A bare `-rocm-*-` glob is satisfied by ANY single
           # version, so a release missing one version entirely would still pass.
           # That matters because a consumer asks for one exact ROCm version by
@@ -1800,6 +1807,7 @@ jobs:
           done
           echo "missing=$missing" >> "$GITHUB_OUTPUT"
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
+          echo "cuda_missing=$cuda_missing" >> "$GITHUB_OUTPUT"
 
           files=$(find ./release -maxdepth 1 \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.tar.xz' -o -name '*.7z' \) 2>/dev/null | wc -l)
 
@@ -1946,6 +1954,7 @@ jobs:
         env:
           TAG_NAME: ${{ steps.tag.outputs.name }}
           RELEASE_SUMMARY: ${{ steps.release_summary.outputs.value }}
+          CUDA_MISSING: ${{ steps.check_artifacts.outputs.cuda_missing }}
         with:
           script: |
             const fs = require('fs');
@@ -1965,33 +1974,36 @@ jobs:
             // runner image its build job uses. Update these if a job moves to another image.
             const ROCM_RUNS_ON = 'Ubuntu 24.04 or newer';
             const CUDA_RUNS_ON = 'Ubuntu 22.04 or newer';
+            // Lowest driver branch for the CUDA 13.x runtime the CUDA builds bundle. Update it with the CUDA major version.
+            const CUDA_DRIVER = 'NVIDIA driver 580 or newer';
             // Both OpenVINO builds start on 24.04. Each is labelled with the Ubuntu it is meant for,
             // so a 24.04 user picks the build made against OpenVINO's own Ubuntu 24.04 runtime.
             const OPENVINO_FOR = { '22': 'Ubuntu 22.04', '24': 'Ubuntu 24.04 or newer' };
 
-            // Every CUDA arch attached for one platform, in arch order: [sm_75](...) [sm_80](...) ...
+            // Every CUDA arch attached for one platform, with sm_all last.
             const cudaLinks = (prefix, suffix) => files
-              .map((file) => file.match(new RegExp(`^llama-${tag}-${prefix}-cuda-sm_(\\d+)-${suffix}$`)))
+              .map((file) => file.match(new RegExp(`^llama-${tag}-${prefix}-cuda-sm_(\\d+|all)-${suffix}$`)))
               .filter(Boolean)
-              .sort((a, b) => Number(a[1]) - Number(b[1]))
+              .sort((a, b) => a[1] === 'all' ? 1 : b[1] === 'all' ? -1 : Number(a[1]) - Number(b[1]))
               .map((m) => md(`sm_${m[1]}`, m[0]));
             const openvino = files
               .map((file) => file.match(new RegExp(`^llama-${tag}-bin-ubuntu-(\\d+)-openvino-(.+)-x64\\.tar\\.gz$`)))
               .filter(Boolean)
               .sort((a, b) => Number(a[1]) - Number(b[1]));
 
+            // Linux CUDA links sit inside a table cell, where a bare | would start a new column, so they are joined with an escaped one.
             const linuxX64 = [
               ...versions.filter((v) => attached.has(rocm('ubuntu', v)))
                 .map((v) => [`ROCm ${v}`, ROCM_RUNS_ON, md('download', rocm('ubuntu', v))]),
               ...openvino.map((m) => [`OpenVINO ${m[2]}`, OPENVINO_FOR[m[1]] || `Ubuntu ${m[1]}.04 or newer`, md('download', m[0])]),
               ...(() => {
                 const links = cudaLinks('ubuntu', 'x64\\.tar\\.xz');
-                return links.length ? [['CUDA', CUDA_RUNS_ON, links.join(' ')]] : [];
+                return links.length ? [['CUDA', `${CUDA_RUNS_ON}, ${CUDA_DRIVER}`, links.join(' \\| ')]] : [];
               })(),
             ];
             const linuxArm64 = (() => {
               const links = cudaLinks('ubuntu', 'arm64\\.tar\\.xz');
-              return links.length ? [['CUDA', CUDA_RUNS_ON, links.join(' ')]] : [];
+              return links.length ? [['CUDA', `${CUDA_RUNS_ON}, ${CUDA_DRIVER}`, links.join(' \\| ')]] : [];
             })();
             const table = (title, rows) => rows.length
               ? [`**${title}**`, '', '| Package | Runs on | Download |', '|---|---|---|', ...rows.map((r) => `| ${r.join(' | ')} |`), '']
@@ -2003,17 +2015,29 @@ jobs:
             const windows = [
               ...(attached.has(cpu) ? [`- CPU: ${md('download', cpu)}`] : []),
               ...(windowsRocm.length ? [`- ROCm: ${windowsRocm.join(' | ')}`] : []),
-              ...(windowsCuda.length ? [`- CUDA: ${windowsCuda.join(' | ')}`] : []),
+              ...(windowsCuda.length ? [`- CUDA (${CUDA_DRIVER}): ${windowsCuda.join(' | ')}`] : []),
             ];
 
             // Anything the release normally carries but this run is not attaching.
-            // A ROCm version ships as a Windows + Linux pair or not at all, and one failed CUDA arch drops every CUDA build.
+            // A ROCm version ships as a Windows + Linux pair or not at all, and a CUDA sm target ships on all three platforms or not at all.
+            const cudaMissingOn = {};
+            for (const entry of (process.env.CUDA_MISSING || '').split(';').filter(Boolean)) {
+              const [sm, platform] = entry.split('=');
+              (cudaMissingOn[sm] ||= []).push(platform);
+            }
+            const cudaDropped = (sm) => {
+              const on = cudaMissingOn[sm] || [];
+              return on.length && on.length < 3
+                ? `- CUDA ${sm}: did not build on ${on.join(' and ')}, so it is not released on any platform.`
+                : `- CUDA ${sm}: did not build on any platform.`;
+            };
             const missing = [
               ...versions
                 .filter((v) => !attached.has(rocm('ubuntu', v)) || !attached.has(rocm('win', v)))
                 .map((v) => `- ROCm ${v}: did not build, or did not pass the release checks. The attached \`qualification-*.json\` records list the failing checks.`),
-              ...(files.some((file) => file.includes('-cuda-sm_'))
-                ? [] : ['- CUDA: at least one CUDA build failed, so no CUDA builds are included.']),
+              ...process.env.CUDA_SMS.split(',').map((sm) => sm.trim()).filter(Boolean)
+                .filter((sm) => !files.some((file) => file.includes(`-cuda-${sm}-`)))
+                .map(cudaDropped),
               ...Object.entries(OPENVINO_FOR)
                 .filter(([ubuntu]) => !openvino.some((m) => m[1] === ubuntu))
                 .map(([, label]) => `- OpenVINO for ${label}: did not build, or did not pass its package checks.`),
