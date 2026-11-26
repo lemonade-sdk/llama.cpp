@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-25T16:30:22Z",
+  "generated_at": "2026-11-26T00:29:03Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-10.1-x64.zip@45389994523",
-    "artifact": "llama-b12695-bin-win-rocm-10.1-x64.zip",
+    "build_id": "llama-bin-win-rocm-10.1-x64.zip@45515647619",
+    "artifact": "llama-b12721-bin-win-rocm-10.1-x64.zip",
     "os": "win",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12695",
-    "upstream_sha": "4c92c5bfb7cab395af9fc0fe0939e34ae5083345",
+    "llamacpp_tag": "b12721",
+    "upstream_sha": "79c69f4b06805fe53c91596de6c958f86dbbdf41",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "45389994523",
+    "run_id": "45515647619",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1335284736
+            "bytes": 1335136768
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 21796,
+          "duration_ms": 21781,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1335284736,
+            "bytes_scanned": 1335136768,
             "bundle_magic_count": 141,
             "expected_count": 22,
             "present_count": 22,
@@ -226,7 +226,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 46,
+          "duration_ms": 32,
           "error": null,
           "details": {
             "returncode": 0,
@@ -241,14 +241,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 2654,
+          "duration_ms": 2488,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 266088088,
-            "sha256": "817cf6f62e2835eae45795b453cc09df3c45a34d10f89aa1c36400d35e754e0d",
-            "expected_sha256": "817cf6f62e2835eae45795b453cc09df3c45a34d10f89aa1c36400d35e754e0d"
+            "bytes": 266492107,
+            "sha256": "bfcde93a5ee0a8e4663517b6fa871da18d334adcf956f2332ec662eca61920a6",
+            "expected_sha256": "bfcde93a5ee0a8e4663517b6fa871da18d334adcf956f2332ec662eca61920a6"
           }
         },
         {
@@ -257,7 +257,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 375,
+          "duration_ms": 406,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -308,7 +308,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 30,
+          "duration_ms": 14,
           "error": null,
           "details": {
             "gpu_proof": [
@@ -338,14 +338,14 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 827,
+          "duration_ms": 641,
           "error": null,
           "details": {
             "finish_reason": "stop",
-            "chars": 656,
-            "reasoning_chars": 625,
+            "chars": 719,
+            "reasoning_chars": 688,
             "answer_chars": 31,
-            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm not missing any other information. The capital is indeed Paris. So the answer is straightforward. I should mention the city and its significance. Maybe start with \"The capital of France is Paris.\" Then",
+            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm not missing any other cities. The capital is Paris, so the answer is straightforward. Maybe start with \"The capital of France is Paris.\" Then mention the city's significance, like being the largest cit",
             "replacement_chars": 0
           }
         },
@@ -355,7 +355,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": false,
-          "duration_ms": 563,
+          "duration_ms": 515,
           "error": null,
           "details": {
             "prompt": "What is 2 + 2?",
@@ -373,7 +373,7 @@
           "duration_ms": 0,
           "error": null,
           "details": {
-            "reasoning_chars": 625,
+            "reasoning_chars": 688,
             "answer_chars": 31,
             "finish_reason": "stop",
             "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm n",
