@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-26T16:38:57Z",
+  "generated_at": "2026-11-27T02:30:41Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@45610246100",
-    "artifact": "llama-b12738-bin-ubuntu-rocm-10.1-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-10.1-x64.tar.gz@45726467316",
+    "artifact": "llama-b12765-bin-ubuntu-rocm-10.1-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12738",
-    "upstream_sha": "48ac7369600b7b760c91bd87d1527cadda9df517",
+    "llamacpp_tag": "b12765",
+    "upstream_sha": "9c003a97ab34a69cc49243f9b02014038205ffae",
     "gfx_target": null,
     "hardware_validated": false,
-    "run_id": "45610246100",
+    "run_id": "45726467316",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1740352496
+            "bytes": 1733698400
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 22583,
+          "duration_ms": 22593,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1740352496,
+            "bytes_scanned": 1733698400,
             "bundle_magic_count": 141,
             "expected_count": 29,
             "present_count": 29,
@@ -228,7 +228,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "error": null,
           "details": {
             "glibc_required": "2.38",
@@ -237,7 +237,7 @@
             "required_by": "ggml-rpc-server",
             "per_file": {
               "ggml-rpc-server": "2.38",
-              "libggml-base.so.1.0.0": "2.38",
+              "libggml-base.so.1.1.0": "2.38",
               "libggml-cpu-alderlake.so": "2.38",
               "libggml-cpu-cannonlake.so": "2.38",
               "libggml-cpu-cascadelake.so": "2.38",
@@ -254,18 +254,18 @@
               "libggml-cpu-zen4.so": "2.38",
               "libggml-hip.so": "2.38",
               "libggml-rpc.so": "2.38",
-              "libggml.so.1.0.0": "2.34",
+              "libggml.so.1.1.0": "2.34",
               "libllama-batched-bench-impl.so": "2.4",
               "libllama-bench-impl.so": "2.38",
               "libllama-cli-impl.so": "2.38",
-              "libllama-common.so.1.0.0": "2.38",
+              "libllama-common.so.1.1.0": "2.38",
               "libllama-completion-impl.so": "2.32",
               "libllama-fit-params-impl.so": "2.14",
               "libllama-perplexity-impl.so": "2.38",
               "libllama-quantize-impl.so": "2.38",
               "libllama-server-impl.so": "2.38",
-              "libllama.so.1.0.0": "2.38",
-              "libmtmd.so.1.0.0": "2.38",
+              "libllama.so.1.1.0": "2.38",
+              "libmtmd.so.1.1.0": "2.38",
               "llama": "2.34",
               "llama-batched-bench": "2.34",
               "llama-bench": "2.34",
@@ -322,14 +322,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 4697,
+          "duration_ms": 6014,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 348732840,
-            "sha256": "8d63e74c1f58b66abb92e511d0e005e0b7edb6f023eb5f5695b189415c9562da",
-            "expected_sha256": "8d63e74c1f58b66abb92e511d0e005e0b7edb6f023eb5f5695b189415c9562da"
+            "bytes": 344520488,
+            "sha256": "9599dbd55a638f401083cd95b10a17e5d467fc275e265f461a41326765553851",
+            "expected_sha256": "9599dbd55a638f401083cd95b10a17e5d467fc275e265f461a41326765553851"
           }
         },
         {

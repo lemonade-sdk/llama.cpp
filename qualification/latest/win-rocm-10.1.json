@@ -1,27 +1,27 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-26T16:38:57Z",
+  "generated_at": "2026-11-27T02:30:41Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-10.1-x64.zip@45610246100",
-    "artifact": "llama-b12738-bin-win-rocm-10.1-x64.zip",
+    "build_id": "llama-bin-win-rocm-10.1-x64.zip@45726467316",
+    "artifact": "llama-b12765-bin-win-rocm-10.1-x64.zip",
     "os": "win",
     "rocm_version": "10.1",
-    "llamacpp_tag": "b12738",
-    "upstream_sha": "48ac7369600b7b760c91bd87d1527cadda9df517",
-    "gfx_target": "gfx1151",
-    "hardware_validated": true,
-    "run_id": "45610246100",
+    "llamacpp_tag": "b12765",
+    "upstream_sha": "9c003a97ab34a69cc49243f9b02014038205ffae",
+    "gfx_target": null,
+    "hardware_validated": false,
+    "run_id": "45726467316",
     "run_attempt": "1"
   },
   "overall": "pass",
   "promoted": true,
   "counts": {
-    "pass": 13,
+    "pass": 8,
     "fail": 0,
     "warn": 0,
     "skip": 2,
-    "total": 15
+    "total": 10
   },
   "tiers": {
     "tier0": {
@@ -56,12 +56,12 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 15,
+          "duration_ms": 0,
           "error": null,
           "details": {
             "backend": "ggml-hip.dll",
             "exists": true,
-            "bytes": 1335137280
+            "bytes": 1329749504
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 21765,
+          "duration_ms": 12188,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
-            "bytes_scanned": 1335137280,
+            "bytes_scanned": 1329749504,
             "bundle_magic_count": 141,
             "expected_count": 22,
             "present_count": 22,
@@ -189,7 +189,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 375,
+          "duration_ms": 359,
           "error": null,
           "details": {
             "binaries_scanned": 50,
@@ -226,7 +226,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 47,
+          "duration_ms": 15,
           "error": null,
           "details": {
             "returncode": 0,
@@ -241,14 +241,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3340,
+          "duration_ms": 5896,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 266503094,
-            "sha256": "0c01ed7fdabe7fcdafb9b1a35fc4d5f267f88d7d85021af2da204accd74b0dcf",
-            "expected_sha256": "0c01ed7fdabe7fcdafb9b1a35fc4d5f267f88d7d85021af2da204accd74b0dcf"
+            "bytes": 263538740,
+            "sha256": "f00d30c894276d2259b13a96a097d549c6112bfdece189e56fd136883348ef04",
+            "expected_sha256": "f00d30c894276d2259b13a96a097d549c6112bfdece189e56fd136883348ef04"
           }
         },
         {
@@ -257,7 +257,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 389,
+          "duration_ms": 375,
           "error": null,
           "details": {
             "rocm_dirs_searched": 5,
@@ -267,117 +267,6 @@
               "hipblas.dll"
             ],
             "unresolved": {}
-          }
-        }
-      ]
-    },
-    "tier1": {
-      "status": "pass",
-      "tier_name": "GPU functional inference",
-      "counts": {
-        "pass": 5,
-        "fail": 0,
-        "warn": 0,
-        "skip": 0,
-        "total": 5
-      },
-      "tests": [
-        {
-          "id": "T1.1",
-          "name": "server boot",
-          "tier": "tier1",
-          "status": "pass",
-          "gating": true,
-          "duration_ms": null,
-          "error": null,
-          "details": {
-            "port": 8231,
-            "args": [
-              "--ctx-size",
-              "4096",
-              "--jinja",
-              "--metrics",
-              "-lv",
-              "4"
-            ]
-          }
-        },
-        {
-          "id": "T1.2",
-          "name": "GPU really did the work",
-          "tier": "tier1",
-          "status": "pass",
-          "gating": true,
-          "duration_ms": 15,
-          "error": null,
-          "details": {
-            "gpu_proof": [
-              "using device ROCm0 (AMD Radeon(TM) 8060S Graphics)",
-              "ROCm0 model buffer size = 358.78 MiB"
-            ],
-            "devices_selected": [
-              {
-                "device": "ROCm0",
-                "name": "AMD Radeon(TM) 8060S Graphics"
-              }
-            ],
-            "model_buffers_mib": [
-              [
-                "ROCm0",
-                358.78
-              ]
-            ],
-            "requested_offload_line": "offloaded 29/29 layers to GPU",
-            "props_status": 200,
-            "props_n_gpu_layers": null
-          }
-        },
-        {
-          "id": "T1.3",
-          "name": "response well-formed",
-          "tier": "tier1",
-          "status": "pass",
-          "gating": true,
-          "duration_ms": 609,
-          "error": null,
-          "details": {
-            "finish_reason": "stop",
-            "chars": 719,
-            "reasoning_chars": 688,
-            "answer_chars": 31,
-            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm not missing any other cities. The capital is Paris, so the answer is straightforward. Maybe start with \"The capital of France is Paris.\" Then mention the city's significance, like being the largest cit",
-            "replacement_chars": 0
-          }
-        },
-        {
-          "id": "T1.4",
-          "name": "greedy determinism",
-          "tier": "tier1",
-          "status": "pass",
-          "gating": false,
-          "duration_ms": 500,
-          "error": null,
-          "details": {
-            "prompt": "What is 2 + 2?",
-            "identical": true,
-            "first": "Okay, so the user is asking, \"What is 2 + 2?\" Let me think about how to approach this. Well, this is a simple arithmetic problem. The question is straightforward: adding 2 and 2 together. \n\nFirst, I need to confirm if there's any trick or hidden",
-            "second": "Okay, so the user is asking, \"What is 2 + 2?\" Let me think about how to approach this. Well, this is a simple arithmetic problem. The question is straightforward: adding 2 and 2 together. \n\nFirst, I need to confirm if there's any trick or hidden"
-          }
-        },
-        {
-          "id": "T1.5",
-          "name": "reasoning pass completed",
-          "tier": "tier1",
-          "status": "pass",
-          "gating": false,
-          "duration_ms": 0,
-          "error": null,
-          "details": {
-            "reasoning_chars": 688,
-            "answer_chars": 31,
-            "finish_reason": "stop",
-            "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm n",
-            "answer_sample": "The capital of France is Paris."
           }
         }
       ]
@@ -436,8 +325,6 @@
       "gfx1201"
     ],
     "missing_from_binary": [],
-    "hardware_validated": [
-      "gfx1151"
-    ]
+    "hardware_validated": []
   }
 }
