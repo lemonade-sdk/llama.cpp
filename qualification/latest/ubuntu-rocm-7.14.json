@@ -1,27 +1,27 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-27T02:30:41Z",
+  "generated_at": "2026-11-27T05:16:09Z",
   "build": {
-    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@45726467316",
-    "artifact": "llama-b12765-bin-ubuntu-rocm-7.14-x64.tar.gz",
+    "build_id": "llama-bin-ubuntu-rocm-7.14-x64.tar.gz@45816213662",
+    "artifact": "llama-b12782-bin-ubuntu-rocm-7.14-x64.tar.gz",
     "os": "ubuntu",
     "rocm_version": "7.14",
-    "llamacpp_tag": "b12765",
-    "upstream_sha": "9c003a97ab34a69cc49243f9b02014038205ffae",
-    "gfx_target": null,
-    "hardware_validated": false,
-    "run_id": "45726467316",
+    "llamacpp_tag": "b12782",
+    "upstream_sha": "b671865c7bd44c8c2d4709b5f707bd55f7f612fd",
+    "gfx_target": "gfx1151",
+    "hardware_validated": true,
+    "run_id": "45816213662",
     "run_attempt": "1"
   },
   "overall": "pass",
   "promoted": true,
   "counts": {
-    "pass": 10,
+    "pass": 15,
     "fail": 0,
     "warn": 0,
     "skip": 0,
-    "total": 10
+    "total": 15
   },
   "tiers": {
     "tier0": {
@@ -61,7 +61,7 @@
           "details": {
             "backend": "libggml-hip.so",
             "exists": true,
-            "bytes": 1584838856
+            "bytes": 1609339552
           }
         },
         {
@@ -70,11 +70,11 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 27196,
+          "duration_ms": 27690,
           "error": null,
           "details": {
             "binary": "libggml-hip.so",
-            "bytes_scanned": 1584838856,
+            "bytes_scanned": 1609339552,
             "bundle_magic_count": 141,
             "expected_count": 27,
             "present_count": 27,
@@ -231,7 +231,7 @@
             "required_by": "ggml-rpc-server",
             "per_file": {
               "ggml-rpc-server": "2.38",
-              "libggml-base.so.1.1.0": "2.38",
+              "libggml-base.so.1.1.1": "2.38",
               "libggml-cpu-alderlake.so": "2.38",
               "libggml-cpu-cannonlake.so": "2.38",
               "libggml-cpu-cascadelake.so": "2.38",
@@ -248,7 +248,7 @@
               "libggml-cpu-zen4.so": "2.38",
               "libggml-hip.so": "2.38",
               "libggml-rpc.so": "2.38",
-              "libggml.so.1.1.0": "2.34",
+              "libggml.so.1.1.1": "2.34",
               "libllama-batched-bench-impl.so": "2.4",
               "libllama-bench-impl.so": "2.38",
               "libllama-cli-impl.so": "2.38",
@@ -301,7 +301,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 20,
+          "duration_ms": 19,
           "error": null,
           "details": {
             "returncode": 0,
@@ -316,14 +316,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 6359,
+          "duration_ms": 5272,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 315246342,
-            "sha256": "f323f3b938f4e0293e46997478dff13c2829aa294d1244f952218bf343829c54",
-            "expected_sha256": "f323f3b938f4e0293e46997478dff13c2829aa294d1244f952218bf343829c54"
+            "bytes": 316710055,
+            "sha256": "dca49c22859aa41bd690caba54c232ad567c9f01ea66fa5bce6d78957d77a1b0",
+            "expected_sha256": "dca49c22859aa41bd690caba54c232ad567c9f01ea66fa5bce6d78957d77a1b0"
           }
         },
         {
@@ -343,6 +343,117 @@
               "librocblas.so.5"
             ],
             "unresolved": {}
+          }
+        }
+      ]
+    },
+    "tier1": {
+      "status": "pass",
+      "tier_name": "GPU functional inference",
+      "counts": {
+        "pass": 5,
+        "fail": 0,
+        "warn": 0,
+        "skip": 0,
+        "total": 5
+      },
+      "tests": [
+        {
+          "id": "T1.1",
+          "name": "server boot",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": null,
+          "error": null,
+          "details": {
+            "port": 8231,
+            "args": [
+              "--ctx-size",
+              "4096",
+              "--jinja",
+              "--metrics",
+              "-lv",
+              "4"
+            ]
+          }
+        },
+        {
+          "id": "T1.2",
+          "name": "GPU really did the work",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 1,
+          "error": null,
+          "details": {
+            "gpu_proof": [
+              "using device ROCm0 (AMD Radeon 8060S Graphics)",
+              "ROCm0 model buffer size = 358.78 MiB"
+            ],
+            "devices_selected": [
+              {
+                "device": "ROCm0",
+                "name": "AMD Radeon 8060S Graphics"
+              }
+            ],
+            "model_buffers_mib": [
+              [
+                "ROCm0",
+                358.78
+              ]
+            ],
+            "requested_offload_line": "offloaded 29/29 layers to GPU",
+            "props_status": 200,
+            "props_n_gpu_layers": null
+          }
+        },
+        {
+          "id": "T1.3",
+          "name": "response well-formed",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": true,
+          "duration_ms": 584,
+          "error": null,
+          "details": {
+            "finish_reason": "stop",
+            "chars": 719,
+            "reasoning_chars": 688,
+            "answer_chars": 31,
+            "sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm not missing any other cities. The capital is Paris, so the answer is straightforward. Maybe start with \"The capital of France is Paris.\" Then mention the city's significance, like being the largest cit",
+            "replacement_chars": 0
+          }
+        },
+        {
+          "id": "T1.4",
+          "name": "greedy determinism",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": false,
+          "duration_ms": 453,
+          "error": null,
+          "details": {
+            "prompt": "What is 2 + 2?",
+            "identical": true,
+            "first": "Okay, so the user is asking, \"What is 2 + 2?\" Let me think about how to approach this. Well, this is a simple arithmetic problem. The question is straightforward: adding 2 and 2 together. \n\nFirst, I need to confirm if there's any trick or hidden",
+            "second": "Okay, so the user is asking, \"What is 2 + 2?\" Let me think about how to approach this. Well, this is a simple arithmetic problem. The question is straightforward: adding 2 and 2 together. \n\nFirst, I need to confirm if there's any trick or hidden"
+          }
+        },
+        {
+          "id": "T1.5",
+          "name": "reasoning pass completed",
+          "tier": "tier1",
+          "status": "pass",
+          "gating": false,
+          "duration_ms": 0,
+          "error": null,
+          "details": {
+            "reasoning_chars": 688,
+            "answer_chars": 31,
+            "finish_reason": "stop",
+            "reasoning_sample": "Okay, the user is asking for the capital of France in a single short paragraph. Let me think. I know that France's capital is Paris. But how to phrase this concisely?\n\nFirst, I need to make sure I'm n",
+            "answer_sample": "The capital of France is Paris."
           }
         }
       ]
@@ -411,6 +522,8 @@
       "gfx950"
     ],
     "missing_from_binary": [],
-    "hardware_validated": []
+    "hardware_validated": [
+      "gfx1151"
+    ]
   }
 }
