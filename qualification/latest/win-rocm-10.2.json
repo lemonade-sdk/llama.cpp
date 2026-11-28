@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "kind": "qualification_record",
-  "generated_at": "2026-11-27T12:31:04Z",
+  "generated_at": "2026-11-28T12:22:03Z",
   "build": {
-    "build_id": "llama-bin-win-rocm-10.2-x64.zip@45914894304",
-    "artifact": "llama-b12806-bin-win-rocm-10.2-x64.zip",
+    "build_id": "llama-bin-win-rocm-10.2-x64.zip@45995584436",
+    "artifact": "llama-b12817-bin-win-rocm-10.2-x64.zip",
     "os": "win",
     "rocm_version": "10.2",
-    "llamacpp_tag": "b12806",
-    "upstream_sha": "a07831a0081f00077b3cf676514c45e34167126c",
+    "llamacpp_tag": "b12817",
+    "upstream_sha": "15fcfc7357f8de73671d39e7d8c594e1beb3052d",
     "gfx_target": "gfx1151",
     "hardware_validated": true,
-    "run_id": "45914894304",
+    "run_id": "45995584436",
     "run_attempt": "1"
   },
   "overall": "pass",
@@ -70,7 +70,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 17078,
+          "duration_ms": 17235,
           "error": null,
           "details": {
             "binary": "ggml-hip.dll",
@@ -241,14 +241,14 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 3486,
+          "duration_ms": 3470,
           "error": null,
           "details": {
             "entries": 51,
             "missing": [],
-            "bytes": 278137406,
-            "sha256": "4354d9f9cf1a16d696d53b004f1a53ac9f332facbe79d057b999272db09b6ace",
-            "expected_sha256": "4354d9f9cf1a16d696d53b004f1a53ac9f332facbe79d057b999272db09b6ace"
+            "bytes": 278169438,
+            "sha256": "d2f3bb561216f6f4d4c7b0de5ce06f3fc6a1ad49538c9317d617eece9e9f2403",
+            "expected_sha256": "d2f3bb561216f6f4d4c7b0de5ce06f3fc6a1ad49538c9317d617eece9e9f2403"
           }
         },
         {
@@ -257,7 +257,7 @@
           "tier": "tier0",
           "status": "pass",
           "gating": true,
-          "duration_ms": 360,
+          "duration_ms": 344,
           "error": null,
           "details": {
             "rocm_dirs_searched": 6,
@@ -308,7 +308,7 @@
           "tier": "tier1",
           "status": "pass",
           "gating": true,
-          "duration_ms": 30,
+          "duration_ms": 15,
           "error": null,
           "details": {
             "gpu_proof": [
